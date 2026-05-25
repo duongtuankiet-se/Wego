@@ -9,7 +9,6 @@ import 'package:sliding_up_panel/sliding_up_panel.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
-import '../../core/widgets/wg_bottom_tab_bar.dart';
 import '../../core/widgets/wg_chip.dart';
 import '../../core/widgets/wg_map_pin.dart';
 import '../../core/widgets/wg_toast.dart';
@@ -80,27 +79,25 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     final recentAsync = ref.watch(recentDestinationsProvider);
     final mq = MediaQuery.of(context);
 
-    const panelMin = 280.0;
+    const panelMin = 96.0;
     final panelMax = mq.size.height * 0.85;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
-      bottomNavigationBar: WgBottomTabBar(
-        activeIndex: 0,
-        onTap: (i) {
-          if (i != 0) WgToast.info(context, 'Tab này đang phát triển');
-        },
-      ),
       body: Stack(
         children: [
           // Sliding panel hosts the map as its body
           SlidingUpPanel(
             minHeight: panelMin,
             maxHeight: panelMax,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            defaultPanelState: PanelState.OPEN,
+            snapPoint: 0.55,
+            parallaxEnabled: true,
+            parallaxOffset: 0.4,
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             color: AppColors.white,
             backdropEnabled: true,
-            backdropOpacity: 0.3,
+            backdropOpacity: 0.25,
             boxShadow: const [
               BoxShadow(
                 blurRadius: 24,

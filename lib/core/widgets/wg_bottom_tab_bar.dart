@@ -1,65 +1,143 @@
+import 'dart:ui';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
 
-class WgBottomTabBar extends StatelessWidget {
-  const WgBottomTabBar({super.key, required this.activeIndex, this.onTap});
+class WgTabItem {
+  final IconData icon;
+  final IconData activeIcon;
+  final String label;
+  const WgTabItem({
+    required this.icon,
+    required this.activeIcon,
+    required this.label,
+  });
+}
 
-  final int activeIndex;
+/// Glassmorphic bottom navigation. Compatible with both the legacy
+/// 4-item shape (`activeIndex` + `onTap` callback) and the Phase 4
+/// shell-driven shape (`items` + `currentIndex`).
+class WgBottomTabBar extends StatelessWidget {
+  const WgBottomTabBar({
+    super.key,
+    this.activeIndex,
+    this.currentIndex,
+    this.items,
+    this.onTap,
+  });
+
+  /// Legacy alias for [currentIndex].
+  final int? activeIndex;
+  final int? currentIndex;
+  final List<WgTabItem>? items;
   final ValueChanged<int>? onTap;
 
-  static const _tabs = [
-    (Icons.home_rounded, Icons.home_outlined, 'Trang chủ'),
-    (Icons.access_time_filled_rounded, Icons.access_time, 'Hoạt động'),
-    (Icons.card_giftcard_rounded, Icons.card_giftcard_outlined, 'Ưu đãi'),
-    (Icons.person_rounded, Icons.person_outline, 'Tài khoản'),
+  static const List<WgTabItem> _defaultItems = [
+    WgTabItem(
+      icon: Icons.home_outlined,
+      activeIcon: Icons.home_rounded,
+      label: 'Trang chủ',
+    ),
+    WgTabItem(
+      icon: Icons.access_time,
+      activeIcon: Icons.access_time_filled,
+      label: 'Hoạt động',
+    ),
+    WgTabItem(
+      icon: Icons.card_giftcard_outlined,
+      activeIcon: Icons.card_giftcard,
+      label: 'Ưu đãi',
+    ),
+    WgTabItem(
+      icon: Icons.support_agent_outlined,
+      activeIcon: Icons.support_agent,
+      label: 'Hỗ trợ',
+    ),
+    WgTabItem(
+      icon: Icons.person_outline,
+      activeIcon: Icons.person,
+      label: 'Tôi',
+    ),
   ];
 
   @override
   Widget build(BuildContext context) {
-    final bottomInset = MediaQuery.of(context).padding.bottom;
-    return DecoratedBox(
-      decoration: const BoxDecoration(
-        color: AppColors.white,
-        border: Border(top: BorderSide(color: AppColors.ink100, width: 0.5)),
-      ),
-      child: SizedBox(
-        height: 64 + bottomInset,
-        child: Padding(
-          padding: EdgeInsets.only(bottom: bottomInset),
-          child: Row(
-            children: List.generate(_tabs.length, (i) {
-              final active = i == activeIndex;
-              final (iconOn, iconOff, label) = _tabs[i];
-              final color = active ? AppColors.primary500 : AppColors.ink500;
-              return Expanded(
-                child: InkWell(
-                  onTap: () {
-                    HapticFeedback.lightImpact();
-                    onTap?.call(i);
-                  },
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(active ? iconOn : iconOff, color: color, size: 24),
-                      const SizedBox(height: 4),
-                      Text(
-                        label,
-                        style: AppTypography.micro.copyWith(
-                          color: color,
-                          fontWeight: active
-                              ? FontWeight.w700
-                              : FontWeight.w500,
-                          letterSpacing: 0.2,
-                        ),
+    final tabs = items ?? _defaultItems;
+    final current = currentIndex ?? activeIndex ?? 0;
+
+    return ClipRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 24, sigmaY: 24),
+        child: DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppColors.white.withValues(alpha: 0.88),
+            border: const Border(
+              top: BorderSide(color: AppColors.ink100, width: 0.5),
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: SizedBox(
+              height: 64,
+              child: Row(
+                children: List.generate(tabs.length, (i) {
+                  final active = i == current;
+                  final t = tabs[i];
+                  final color = active
+                      ? AppColors.primary500
+                      : AppColors.ink400;
+                  return Expanded(
+                    child: InkWell(
+                      onTap: () {
+                        HapticFeedback.lightImpact();
+                        onTap?.call(i);
+                      },
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          AnimatedSwitcher(
+                            duration: const Duration(milliseconds: 200),
+                            child: Icon(
+                              active ? t.activeIcon : t.icon,
+                              key: ValueKey(active),
+                              color: color,
+                              size: 24,
+                            ),
+                          ),
+                          const SizedBox(height: 3),
+                          Text(
+                            t.label,
+                            style: AppTypography.micro.copyWith(
+                              color: color,
+                              fontWeight: active
+                                  ? FontWeight.w700
+                                  : FontWeight.w500,
+                              fontSize: 10.5,
+                              letterSpacing: 0.1,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          const SizedBox(height: 4),
+                          AnimatedContainer(
+                            duration: const Duration(milliseconds: 220),
+                            width: active ? 14 : 0,
+                            height: 3,
+                            decoration: BoxDecoration(
+                              color: AppColors.primary500,
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
-                  ),
-                ),
-              );
-            }),
+                    ),
+                  );
+                }),
+              ),
+            ),
           ),
         ),
       ),
