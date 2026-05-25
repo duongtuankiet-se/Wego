@@ -4,13 +4,17 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import 'core/theme/app_colors.dart';
-import 'core/theme/app_typography.dart';
 import 'models/user.dart';
 import 'screens/_dev/showcase_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_select_screen.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/driver/driver_earnings_screen.dart';
+import 'screens/driver/driver_home_screen.dart';
+import 'screens/driver/driver_navigation_screen.dart';
+import 'screens/driver/driver_performance_screen.dart';
+import 'screens/driver/driver_trip_completed_screen.dart';
+import 'screens/driver/driver_wallet_screen.dart';
 import 'screens/passenger/home_screen.dart';
 import 'screens/passenger/live_trip_screen.dart';
 import 'screens/passenger/matching_screen.dart';
@@ -84,8 +88,41 @@ GoRouter router(Ref ref) {
       ),
       GoRoute(
         path: '/driver/home',
-        builder: (context, state) =>
-            const _PlaceholderHome(role: 'driver', title: 'Trang chủ Tài xế'),
+        pageBuilder: (context, state) =>
+            _fadeScalePage(state: state, child: const DriverHomeScreen()),
+      ),
+      GoRoute(
+        path: '/driver/navigation/:tripId',
+        pageBuilder: (context, state) => _fadeScalePage(
+          state: state,
+          child: DriverNavigationScreen(
+            tripId: state.pathParameters['tripId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/driver/trip-completed/:tripId',
+        pageBuilder: (context, state) => _slideUpPage(
+          state: state,
+          child: DriverTripCompletedScreen(
+            tripId: state.pathParameters['tripId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        path: '/driver/earnings',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const DriverEarningsScreen()),
+      ),
+      GoRoute(
+        path: '/driver/wallet',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const DriverWalletScreen()),
+      ),
+      GoRoute(
+        path: '/driver/performance',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const DriverPerformanceScreen()),
       ),
       if (kDebugMode)
         GoRoute(
@@ -149,41 +186,4 @@ CustomTransitionPage<T> _slideUpPage<T>({
       );
     },
   );
-}
-
-class _PlaceholderHome extends StatelessWidget {
-  const _PlaceholderHome({required this.role, required this.title});
-  final String role;
-  final String title;
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: Text(title)),
-      body: Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(
-              role == 'driver' ? Icons.directions_car : Icons.person,
-              size: 80,
-              color: AppColors.primary500,
-            ),
-            const SizedBox(height: 16),
-            Text('Phase 0 placeholder', style: AppTypography.h2),
-            const SizedBox(height: 8),
-            Text('role = $role', style: AppTypography.body),
-            if (kDebugMode) ...[
-              const SizedBox(height: 24),
-              TextButton.icon(
-                onPressed: () => context.push('/showcase'),
-                icon: const Icon(Icons.palette),
-                label: const Text('Mở Showcase (debug)'),
-              ),
-            ],
-          ],
-        ),
-      ),
-    );
-  }
 }
