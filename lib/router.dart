@@ -12,7 +12,11 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_select_screen.dart';
 import 'screens/auth/splash_screen.dart';
 import 'screens/passenger/home_screen.dart';
+import 'screens/passenger/live_trip_screen.dart';
+import 'screens/passenger/matching_screen.dart';
+import 'screens/passenger/ride_options_screen.dart';
 import 'screens/passenger/search_screen.dart';
+import 'screens/passenger/trip_summary_screen.dart';
 
 part 'router.g.dart';
 
@@ -46,6 +50,37 @@ GoRouter router(Ref ref) {
         path: '/passenger/search',
         pageBuilder: (context, state) =>
             _slideUpPage(state: state, child: const PassengerSearchScreen()),
+      ),
+      GoRoute(
+        path: '/passenger/ride-options',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const RideOptionsScreen()),
+      ),
+      GoRoute(
+        path: '/passenger/matching',
+        pageBuilder: (context, state) {
+          final extra =
+              (state.extra as Map?)?.cast<String, Object>() ??
+              <String, Object>{};
+          return _fadeScalePage(
+            state: state,
+            child: MatchingScreen(extra: extra),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/passenger/live-trip/:tripId',
+        pageBuilder: (context, state) => _fadeScalePage(
+          state: state,
+          child: LiveTripScreen(tripId: state.pathParameters['tripId']!),
+        ),
+      ),
+      GoRoute(
+        path: '/passenger/trip-summary/:tripId',
+        pageBuilder: (context, state) => _slideUpPage(
+          state: state,
+          child: TripSummaryScreen(tripId: state.pathParameters['tripId']!),
+        ),
       ),
       GoRoute(
         path: '/driver/home',
