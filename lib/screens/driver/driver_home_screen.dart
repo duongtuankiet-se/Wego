@@ -18,7 +18,7 @@ import '../../core/widgets/wg_status_toggle.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_hotspots.dart';
 import '../../models/driver.dart';
-import '../../providers/auth_provider.dart';
+import '../../models/trip.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/driver_provider.dart';
 import '../../providers/driver_status_provider.dart';
@@ -39,37 +39,18 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   final MapController _map = MapController();
-  Timer? _dispatchTimer;
   bool _modalOpen = false;
-  bool _initialized = false;
+  String? _lastHandledOfferId;
 
   @override
   void dispose() {
-    _dispatchTimer?.cancel();
     _map.dispose();
     super.dispose();
   }
 
-  void _scheduleDispatch(LatLng driverPos) {
-    _dispatchTimer?.cancel();
-    _dispatchTimer = Timer(const Duration(seconds: 5), () {
-      if (!mounted) return;
-      _showOffer(driverPos);
-    });
-  }
-
-  Future<void> _showOffer(LatLng driverPos) async {
-    if (_modalOpen) return;
-    final status = ref.read(currentDriverStatusProvider).valueOrNull;
-    final activeTrip = ref.read(currentTripProvider);
-    if (status != DriverStatus.online || activeTrip != null) return;
-
-    final offer = generateOffer(
-      driverLat: driverPos.latitude,
-      driverLng: driverPos.longitude,
-    );
-    ref.read(activeOfferProvider.notifier).set(offer);
-
+  Future<void> _handleIncomingOffer(IncomingTripOffer offer) async {
+    if (_modalOpen || offer.offerId == _lastHandledOfferId) return;
+    _lastHandledOfferId = offer.offerId;
     _modalOpen = true;
     final accepted = await showIncomingTripDialog(
       context,
@@ -79,37 +60,38 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     _modalOpen = false;
     if (!mounted) return;
     if (!accepted) {
-      // User declined → reschedule another offer after a short pause.
+      // Driver declined → release the trip back to the pool so dispatcher
+      // (or another driver in a multi-driver demo) can pick it up.
+      if (offer.tripId != null) {
+        try {
+          await ref
+              .read(tripServiceProvider)
+              .updateStatus(offer.tripId!, TripStatus.pending);
+        } catch (_) {}
+      }
+      if (!mounted) return;
       WgToast.info(context, 'Đã từ chối — đang tìm chuyến khác...');
-      _scheduleDispatch(driverPos);
+      ref.invalidate(incomingTripPollProvider);
     }
   }
 
   Future<bool> _acceptOffer(IncomingTripOffer offer) async {
     try {
-      final driver = await ref.read(currentDriverProvider.future);
-      final user = ref.read(authStateProvider).valueOrNull;
-      if (driver == null || user == null) {
-        throw Exception('Chưa đăng nhập tài xế');
+      // Real offer from polling → the trip already exists with this
+      // driver assigned; just load it and navigate.
+      if (offer.tripId != null) {
+        final tripService = ref.read(tripServiceProvider);
+        final active = await tripService.loadActiveTrip(offer.tripId!);
+        if (active == null) {
+          throw Exception('Không tải được chuyến đi');
+        }
+        ref.read(currentTripProvider.notifier).set(active);
+        if (!mounted) return false;
+        context.go('/driver/navigation/${active.tripId}');
+        return true;
       }
-      // Reuse TripService.createTrip — it inserts the trip with status
-      // accepted and wires up a mock passenger automatically. Here the
-      // "passenger" is our offer's mock data; we still need to persist
-      // a passenger doc reference so use the logged-in user as a stand-in.
-      final tripService = ref.read(tripServiceProvider);
-      final active = await tripService.createTrip(
-        passengerId: user.id, // demo stand-in
-        pickup: offer.pickup,
-        dropoff: offer.dropoff,
-        type: offer.type,
-        price: offer.price,
-        distanceKm: offer.tripDistanceKm,
-        durationMin: offer.tripDurationMin,
-      );
-      ref.read(currentTripProvider.notifier).set(active);
-      if (!mounted) return false;
-      context.go('/driver/navigation/${active.tripId}');
-      return true;
+      // Mock offer fallback (no real trip in Mongo) — Phase 2 path.
+      throw Exception('Offer không có tripId — cần passenger book trước');
     } catch (e) {
       if (mounted) WgToast.error(context, 'Không nhận được chuyến: $e');
       return false;
@@ -129,9 +111,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         isOnline ? 'Đã bật nhận chuyến' : 'Đã tắt nhận chuyến',
       );
       if (isOnline) {
-        _scheduleDispatch(pos);
-      } else {
-        _dispatchTimer?.cancel();
+        // Reset the poll cursor so it starts looking immediately.
+        ref.invalidate(incomingTripPollProvider);
       }
     } catch (e) {
       if (mounted) WgToast.error(context, 'Lỗi cập nhật trạng thái: $e');
@@ -146,13 +127,16 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final statsAsync = ref.watch(driverTodayStatsProvider);
     final loc = locAsync.valueOrNull ?? kDanangFallback;
 
-    // Kick off the first dispatch timer once status flips online.
-    if (!_initialized && statusAsync.valueOrNull == DriverStatus.online) {
-      _initialized = true;
-      WidgetsBinding.instance.addPostFrameCallback(
-        (_) => _scheduleDispatch(loc),
-      );
-    }
+    // Watch incoming trip stream — when an offer arrives, show modal.
+    ref.listen<AsyncValue<IncomingTripOffer?>>(incomingTripPollProvider, (
+      prev,
+      next,
+    ) {
+      final offer = next.valueOrNull;
+      if (offer != null && offer.tripId != null) {
+        _handleIncomingOffer(offer);
+      }
+    });
 
     final mq = MediaQuery.of(context);
     const panelMin = 280.0;
@@ -179,14 +163,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             panelBuilder: (sc) => _Panel(scrollController: sc),
             body: _MapBody(controller: _map, driverPos: loc),
           ),
-          // Top header glass
           Positioned(
             top: mq.padding.top + 12,
             left: 16,
             right: 16,
             child: _TopHeader(driver: driverAsync.valueOrNull),
           ),
-          // Status toggle below header
           Positioned(
             top: mq.padding.top + 76,
             left: 0,
@@ -199,7 +181,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               ),
             ),
           ),
-          // FAB recenter
           Positioned(
             right: 16,
             bottom: panelMin + 88,
@@ -210,7 +191,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
               },
             ),
           ),
-          // Stats strip floating just above panel peek
           Positioned(
             left: 20,
             right: 20,
@@ -294,7 +274,6 @@ class _TopHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        // Driver mini profile (glass pill)
         Flexible(
           child: Container(
             padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),

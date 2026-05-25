@@ -59,6 +59,23 @@ class DriverService {
     return doc == null ? null : Driver.fromMongo(doc);
   }
 
+  /// Lightweight write of just the driver's current position + geohash.
+  /// Use from the navigation screen on a 3-second throttle.
+  Future<void> updateDriverLocation({
+    required String driverId,
+    required double lat,
+    required double lng,
+  }) async {
+    await (await _mongo.drivers()).updateOne(
+      where.eq('_id', ObjectId.fromHexString(driverId)),
+      modify
+          .set('current_lat', lat)
+          .set('current_lng', lng)
+          .set('current_geohash', GeohashUtil.encode(lat, lng))
+          .set('updated_at', DateTime.now().toUtc()),
+    );
+  }
+
   /// Toggle the dispatch status (offline/online/busy). Also writes the
   /// last-known position so the heat map matches the actual driver.
   Future<void> setStatus({
