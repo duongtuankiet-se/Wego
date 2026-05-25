@@ -4,17 +4,27 @@ import 'package:mongo_dart/mongo_dart.dart' show ObjectId;
 part 'driver.freezed.dart';
 part 'driver.g.dart';
 
-enum DriverStatus { pending, active, suspended }
+/// Driver lifecycle status. `pending/active/suspended` are admin-side
+/// (account approval); `offline/online/busy` are runtime dispatch states.
+enum DriverStatus { pending, active, suspended, offline, online, busy }
 
 @freezed
 class Driver with _$Driver {
   const factory Driver({
     required String id,
     required String userId,
+    String? name,
+    String? phone,
     String? licenseNumber,
+    String? vehicleModel,
+    String? vehicleColor,
+    String? vehiclePlate,
     @Default(0.0) double ratingAvg,
     @Default(0) int totalTrips,
-    @Default(DriverStatus.pending) DriverStatus status,
+    @Default(DriverStatus.offline) DriverStatus status,
+    double? currentLat,
+    double? currentLng,
+    String? currentGeohash,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Driver;
@@ -26,10 +36,18 @@ class Driver with _$Driver {
     userId: doc['user_id'] is ObjectId
         ? (doc['user_id'] as ObjectId).oid
         : doc['user_id'] as String,
+    name: doc['name'] as String?,
+    phone: doc['phone'] as String?,
     licenseNumber: doc['license_number'] as String?,
+    vehicleModel: doc['vehicle_model'] as String?,
+    vehicleColor: doc['vehicle_color'] as String?,
+    vehiclePlate: doc['vehicle_plate'] as String?,
     ratingAvg: (doc['rating_avg'] as num?)?.toDouble() ?? 0.0,
     totalTrips: (doc['total_trips'] as num?)?.toInt() ?? 0,
-    status: DriverStatus.values.byName((doc['status'] as String?) ?? 'pending'),
+    status: DriverStatus.values.byName((doc['status'] as String?) ?? 'offline'),
+    currentLat: (doc['current_lat'] as num?)?.toDouble(),
+    currentLng: (doc['current_lng'] as num?)?.toDouble(),
+    currentGeohash: doc['current_geohash'] as String?,
     createdAt: doc['created_at'] as DateTime,
     updatedAt: doc['updated_at'] as DateTime,
   );

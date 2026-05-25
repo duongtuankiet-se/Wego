@@ -3,6 +3,7 @@ import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../core/utils/format.dart';
+import '../data/mock_drivers.dart';
 import '../models/user.dart';
 import 'mongo_provider.dart';
 
@@ -79,7 +80,8 @@ class AuthState extends _$AuthState {
           ..['updated_at'] = now;
       }
 
-      // If driver, ensure a stub driver record exists.
+      // If driver, ensure a stub driver record exists with mock vehicle
+      // assigned round-robin so the UI has something to display.
       if (role == UserRole.driver) {
         final drivers = await mongo.drivers();
         final userId = finalDoc['_id'] as ObjectId;
@@ -87,16 +89,40 @@ class AuthState extends _$AuthState {
           where.eq('user_id', userId),
         );
         if (existingDriver == null) {
+          // Pick a mock vehicle profile by hashing user-id hex to spread
+          // drivers across the 3 templates deterministically.
+          final vehicleIdx =
+              userId.oid.codeUnits.fold<int>(0, (a, b) => a + b) %
+              kMockDrivers.length;
+          final v = kMockDrivers[vehicleIdx];
           await drivers.insertOne(<String, dynamic>{
             '_id': ObjectId(),
             'user_id': userId,
+            'name': trimmedName,
+            'phone': normalizedPhone,
             'license_number': null,
+            'vehicle_model': v.vehicleModel,
+            'vehicle_color': v.vehicleColor,
+            'vehicle_plate': v.vehiclePlate,
             'rating_avg': 0.0,
             'total_trips': 0,
-            'status': 'pending',
+            'status': 'offline',
+            'current_lat': null,
+            'current_lng': null,
+            'current_geohash': null,
             'created_at': now,
             'updated_at': now,
           });
+        } else {
+          // Keep name/phone in sync so the driver header stays correct
+          // if the user edits their profile later.
+          await drivers.updateOne(
+            where.eq('_id', existingDriver['_id']),
+            modify
+                .set('name', trimmedName)
+                .set('phone', normalizedPhone)
+                .set('updated_at', now),
+          );
         }
       }
 
