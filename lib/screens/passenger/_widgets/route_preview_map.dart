@@ -1,133 +1,106 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_map/flutter_map.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
-import '../../../core/theme/app_typography.dart';
 
-/// Static (non-interactive) FlutterMap that fits pickup + dropoff in view
-/// and renders a straight polyline between them. Used by RideOptions and
-/// TripSummary.
+/// Static (non-interactive) Google Map preview that fits pickup + dropoff
+/// in view and draws a polyline between them. Used by RideOptions and
+/// TripSummary. Defaults to a straight-line polyline; callers can pass a
+/// pre-computed Directions route via [routePoints] for the real curve.
 class RoutePreviewMap extends StatelessWidget {
   const RoutePreviewMap({
     super.key,
     required this.pickup,
     required this.dropoff,
+    this.routePoints,
     this.height = 200,
     this.borderRadius,
-    this.showAttribution = true,
   });
 
   final LatLng pickup;
   final LatLng dropoff;
+  final List<LatLng>? routePoints;
   final double height;
   final BorderRadius? borderRadius;
-  final bool showAttribution;
+
+  /// Padding the static fit applies so markers don't sit on the edge.
+  double _padFor(double h) => h < 130 ? 30 : 50;
 
   @override
   Widget build(BuildContext context) {
     final radius = borderRadius ?? BorderRadius.zero;
+    final poly = routePoints ?? <LatLng>[pickup, dropoff];
+    final sw = LatLng(
+      pickup.latitude < dropoff.latitude
+          ? pickup.latitude
+          : dropoff.latitude,
+      pickup.longitude < dropoff.longitude
+          ? pickup.longitude
+          : dropoff.longitude,
+    );
+    final ne = LatLng(
+      pickup.latitude > dropoff.latitude
+          ? pickup.latitude
+          : dropoff.latitude,
+      pickup.longitude > dropoff.longitude
+          ? pickup.longitude
+          : dropoff.longitude,
+    );
+    final bounds = LatLngBounds(southwest: sw, northeast: ne);
     return ClipRRect(
       borderRadius: radius,
       child: SizedBox(
         height: height,
-        child: FlutterMap(
-          options: MapOptions(
-            initialCameraFit: CameraFit.bounds(
-              bounds: LatLngBounds.fromPoints([pickup, dropoff]),
-              padding: const EdgeInsets.all(40),
+        child: GoogleMap(
+          initialCameraPosition: CameraPosition(
+            target: LatLng(
+              (pickup.latitude + dropoff.latitude) / 2,
+              (pickup.longitude + dropoff.longitude) / 2,
             ),
-            interactionOptions: const InteractionOptions(
-              flags: InteractiveFlag.none,
-            ),
+            zoom: 13,
           ),
-          children: [
-            TileLayer(
-              urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-              userAgentPackageName: 'vn.exe.wego',
-              maxZoom: 19,
-            ),
-            PolylineLayer(
-              polylines: [
-                Polyline(
-                  points: [pickup, dropoff],
-                  color: AppColors.primary500,
-                  strokeWidth: 4.5,
-                ),
-              ],
-            ),
-            MarkerLayer(
-              markers: [
-                Marker(
-                  point: pickup,
-                  width: 22,
-                  height: 22,
-                  child: const _OriginDot(),
-                ),
-                Marker(
-                  point: dropoff,
-                  width: 22,
-                  height: 22,
-                  child: const _DestinationDot(),
-                ),
-              ],
-            ),
-            if (showAttribution)
-              RichAttributionWidget(
-                alignment: AttributionAlignment.bottomRight,
-                showFlutterMapAttribution: false,
-                attributions: [
-                  TextSourceAttribution(
-                    '© OpenStreetMap contributors',
-                    textStyle: AppTypography.micro.copyWith(
-                      color: AppColors.ink700,
-                    ),
-                    onTap: () {},
-                  ),
-                ],
+          onMapCreated: (controller) {
+            // Defer fitting bounds until the platform view is ready,
+            // otherwise the call is silently dropped.
+            Future.delayed(const Duration(milliseconds: 300), () {
+              controller.animateCamera(
+                CameraUpdate.newLatLngBounds(bounds, _padFor(height)),
+              );
+            });
+          },
+          zoomControlsEnabled: false,
+          myLocationButtonEnabled: false,
+          compassEnabled: false,
+          rotateGesturesEnabled: false,
+          scrollGesturesEnabled: false,
+          zoomGesturesEnabled: false,
+          tiltGesturesEnabled: false,
+          liteModeEnabled: false,
+          markers: <Marker>{
+            Marker(
+              markerId: const MarkerId('pickup'),
+              position: pickup,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueGreen,
               ),
-          ],
+            ),
+            Marker(
+              markerId: const MarkerId('dropoff'),
+              position: dropoff,
+              icon: BitmapDescriptor.defaultMarkerWithHue(
+                BitmapDescriptor.hueRed,
+              ),
+            ),
+          },
+          polylines: <Polyline>{
+            Polyline(
+              polylineId: const PolylineId('route'),
+              points: poly,
+              color: AppColors.primary500,
+              width: 5,
+            ),
+          },
         ),
-      ),
-    );
-  }
-}
-
-class _OriginDot extends StatelessWidget {
-  const _OriginDot();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.success,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.success.withValues(alpha: 0.4),
-            blurRadius: 8,
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _DestinationDot extends StatelessWidget {
-  const _DestinationDot();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.danger,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.white, width: 3),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.danger.withValues(alpha: 0.4),
-            blurRadius: 8,
-          ),
-        ],
       ),
     );
   }

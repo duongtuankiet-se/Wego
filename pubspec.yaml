@@ -27,8 +27,9 @@ dependencies:
   lottie: ^3.3.0
   sliding_up_panel: ^2.0.0+1
   dart_geohash: ^2.0.2
-  flutter_map: ^7.0.2
-  latlong2: ^0.9.1
+  google_maps_flutter: ^2.10.0
+  flutter_polyline_points: ^2.1.0
+  http: ^1.2.2
   geolocator: ^13.0.2
   permission_handler: ^11.3.1
 

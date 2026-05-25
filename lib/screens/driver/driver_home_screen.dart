@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -13,7 +12,6 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_incentive_card.dart';
-import '../../core/widgets/wg_map_pin.dart';
 import '../../core/widgets/wg_status_toggle.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_hotspots.dart';
@@ -38,13 +36,13 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
-  final MapController _map = MapController();
+  GoogleMapController? _map;
   bool _modalOpen = false;
   String? _lastHandledOfferId;
 
   @override
   void dispose() {
-    _map.dispose();
+    _map?.dispose();
     super.dispose();
   }
 
@@ -166,7 +164,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             ],
             panelBuilder: (sc) =>
                 _Panel(scrollController: sc, statsAsync: statsAsync),
-            body: _MapBody(controller: _map, driverPos: loc),
+            body: _MapBody(
+              onMapCreated: (c) => _map = c,
+              driverPos: loc,
+            ),
           ),
           Positioned(
             top: mq.padding.top + 12,
@@ -192,7 +193,7 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             child: _RecenterFab(
               onTap: () {
                 HapticFeedback.mediumImpact();
-                _map.move(loc, 14);
+                _map?.animateCamera(CameraUpdate.newLatLngZoom(loc, 14));
               },
             ),
           ),
@@ -203,64 +204,44 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 }
 
 class _MapBody extends StatelessWidget {
-  const _MapBody({required this.controller, required this.driverPos});
-  final MapController controller;
+  const _MapBody({required this.onMapCreated, required this.driverPos});
+  final ValueChanged<GoogleMapController> onMapCreated;
   final LatLng driverPos;
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: controller,
-      options: MapOptions(
-        initialCenter: driverPos,
-        initialZoom: 13,
-        minZoom: 4,
-        maxZoom: 18,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(target: driverPos, zoom: 13),
+      onMapCreated: onMapCreated,
+      myLocationEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      circles: <Circle>{
+        for (final h in kHotspots)
+          Circle(
+            circleId: CircleId(h.id),
+            center: LatLng(h.lat, h.lng),
+            // CircleLayer used pixels; Google Maps uses meters. ~500m
+            // visualises the demand zone well at default city zoom.
+            radius: h.heatRadius * 8,
+            fillColor: h.heatColor.withValues(alpha: 0.18),
+            strokeColor: h.heatColor.withValues(alpha: 0.55),
+            strokeWidth: 1,
+          ),
+      },
+      markers: <Marker>{
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: driverPos,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
         ),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'vn.exe.wego',
-          maxZoom: 19,
-        ),
-        CircleLayer(
-          circles: [
-            for (final h in kHotspots)
-              CircleMarker(
-                point: LatLng(h.lat, h.lng),
-                radius: h.heatRadius,
-                useRadiusInMeter: false,
-                color: h.heatColor.withValues(alpha: 0.25),
-                borderColor: h.heatColor.withValues(alpha: 0.55),
-                borderStrokeWidth: 1,
-              ),
-          ],
-        ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: driverPos,
-              width: 50,
-              height: 50,
-              child: const WgMapPin(color: AppColors.info, size: 50),
-            ),
-          ],
-        ),
-        RichAttributionWidget(
-          alignment: AttributionAlignment.bottomLeft,
-          showFlutterMapAttribution: false,
-          attributions: [
-            TextSourceAttribution(
-              '© OpenStreetMap',
-              textStyle: AppTypography.micro.copyWith(color: AppColors.ink700),
-              onTap: () {},
-            ),
-          ],
-        ),
-      ],
+      },
     );
   }
 }

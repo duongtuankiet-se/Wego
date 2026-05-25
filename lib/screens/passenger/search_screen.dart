@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -16,6 +16,7 @@ import '../../providers/location_provider.dart';
 import '../../providers/places_provider.dart';
 import '../../providers/recent_destinations_provider.dart';
 import '../../providers/selected_destination_provider.dart';
+import '../../services/places_service.dart';
 import '_widgets/place_list_item.dart';
 import '_widgets/route_input_card.dart';
 
@@ -30,6 +31,8 @@ class PassengerSearchScreen extends ConsumerStatefulWidget {
 class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
   final _dropoffCtrl = TextEditingController();
   Timer? _debounce;
+  List<PlaceSuggestion> _apiSuggestions = const [];
+  bool _apiLoading = false;
 
   @override
   void dispose() {
@@ -40,9 +43,20 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
 
   void _onQueryChanged(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 200), () {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       if (!mounted) return;
       ref.read(searchQueryProvider.notifier).setQuery(value);
+      if (value.trim().length < 2) {
+        setState(() => _apiSuggestions = const []);
+        return;
+      }
+      setState(() => _apiLoading = true);
+      final list = await PlacesService.autocomplete(value);
+      if (!mounted) return;
+      setState(() {
+        _apiSuggestions = list;
+        _apiLoading = false;
+      });
     });
   }
 
@@ -52,6 +66,25 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
     ref.read(searchQueryProvider.notifier).clear();
     if (!mounted) return;
     context.pop(place);
+  }
+
+  Future<void> _selectSuggestion(PlaceSuggestion s) async {
+    setState(() => _apiLoading = true);
+    final details = await PlacesService.getDetails(s.placeId);
+    if (!mounted) return;
+    setState(() => _apiLoading = false);
+    if (details == null) {
+      WgToast.error(context, 'Không lấy được thông tin địa điểm');
+      return;
+    }
+    final place = Place(
+      id: details.placeId,
+      name: s.mainText.isNotEmpty ? s.mainText : details.name,
+      address: details.address,
+      lat: details.lat,
+      lng: details.lng,
+    );
+    await _select(place);
   }
 
   @override
@@ -117,12 +150,14 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
                       onSelect: _select,
                       origin: origin,
                     )
-                  : results.isEmpty
-                  ? _NoResults(query: query)
-                  : _ResultsList(
-                      results: results,
+                  : _CombinedResults(
+                      query: query,
+                      localResults: results,
+                      apiSuggestions: _apiSuggestions,
+                      apiLoading: _apiLoading,
                       origin: origin,
-                      onSelect: _select,
+                      onLocalSelect: _select,
+                      onApiSelect: _selectSuggestion,
                     ),
             ),
           ],
@@ -132,6 +167,7 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
   }
 }
 
+// ignore: unused_element
 class _ResultsList extends StatelessWidget {
   const _ResultsList({
     required this.results,
@@ -318,6 +354,140 @@ class _SavedRow extends StatelessWidget {
           ),
         ],
       ),
+    );
+  }
+}
+
+class _CombinedResults extends StatelessWidget {
+  const _CombinedResults({
+    required this.query,
+    required this.localResults,
+    required this.apiSuggestions,
+    required this.apiLoading,
+    required this.origin,
+    required this.onLocalSelect,
+    required this.onApiSelect,
+  });
+
+  final String query;
+  final List<Place> localResults;
+  final List<PlaceSuggestion> apiSuggestions;
+  final bool apiLoading;
+  final LatLng origin;
+  final ValueChanged<Place> onLocalSelect;
+  final ValueChanged<PlaceSuggestion> onApiSelect;
+
+  @override
+  Widget build(BuildContext context) {
+    if (localResults.isEmpty && apiSuggestions.isEmpty && !apiLoading) {
+      return _NoResults(query: query);
+    }
+    return ListView(
+      padding: const EdgeInsets.only(top: 4, bottom: 24),
+      children: [
+        if (localResults.isNotEmpty) ...[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
+            child: Text(
+              'Gợi ý nhanh',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.ink500,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+          ...localResults.map((p) {
+            final dist = GeohashUtil.distanceKm(
+              origin.latitude,
+              origin.longitude,
+              p.lat,
+              p.lng,
+            );
+            return PlaceListItem(
+              place: p,
+              distanceKm: dist,
+              onTap: () => onLocalSelect(p),
+            );
+          }),
+        ],
+        if (apiLoading || apiSuggestions.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+            child: Row(
+              children: [
+                Text(
+                  'Tìm trên Google Maps',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.ink500,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (apiLoading) ...[
+                  const SizedBox(width: 8),
+                  const SizedBox(
+                    width: 12,
+                    height: 12,
+                    child: CircularProgressIndicator(strokeWidth: 1.5),
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ...apiSuggestions.map(
+          (s) => InkWell(
+            onTap: () => onApiSelect(s),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20,
+                vertical: 12,
+              ),
+              child: Row(
+                children: [
+                  Container(
+                    width: 40,
+                    height: 40,
+                    decoration: BoxDecoration(
+                      color: AppColors.primary50,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: const Icon(
+                      Icons.location_on_outlined,
+                      color: AppColors.primary500,
+                      size: 22,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          s.mainText,
+                          style: AppTypography.body.copyWith(
+                            color: AppColors.ink900,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (s.secondaryText.isNotEmpty)
+                          Text(
+                            s.secondaryText,
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.ink500,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }
