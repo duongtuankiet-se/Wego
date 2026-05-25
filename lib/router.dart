@@ -15,20 +15,32 @@ import 'screens/driver/driver_earnings_screen.dart';
 import 'screens/driver/driver_home_screen.dart';
 import 'screens/driver/driver_navigation_screen.dart';
 import 'screens/driver/driver_performance_screen.dart';
+import 'screens/driver/driver_profile_screen.dart';
+import 'screens/driver/driver_shell.dart';
 import 'screens/driver/driver_trip_completed_screen.dart';
 import 'screens/driver/driver_wallet_screen.dart';
 import 'screens/passenger/home_screen.dart';
 import 'screens/passenger/live_trip_screen.dart';
 import 'screens/passenger/matching_screen.dart';
+import 'screens/passenger/passenger_activity_screen.dart';
+import 'screens/passenger/passenger_profile_screen.dart';
+import 'screens/passenger/passenger_promo_screen.dart';
+import 'screens/passenger/passenger_shell.dart';
+import 'screens/passenger/passenger_support_screen.dart';
 import 'screens/passenger/ride_options_screen.dart';
 import 'screens/passenger/search_screen.dart';
 import 'screens/passenger/trip_summary_screen.dart';
 
 part 'router.g.dart';
 
+final _rootKey = GlobalKey<NavigatorState>();
+final _passengerKey = GlobalKey<NavigatorState>();
+final _driverKey = GlobalKey<NavigatorState>();
+
 @Riverpod(keepAlive: true)
 GoRouter router(Ref ref) {
   return GoRouter(
+    navigatorKey: _rootKey,
     initialLocation: '/',
     debugLogDiagnostics: kDebugMode,
     routes: [
@@ -47,22 +59,152 @@ GoRouter router(Ref ref) {
           return LoginScreen(role: role);
         },
       ),
-      GoRoute(
-        path: '/passenger/home',
-        pageBuilder: (context, state) =>
-            _fadeScalePage(state: state, child: const PassengerHomeScreen()),
+
+      // ── Passenger shell — 5 tabs ──────────────────────────────────
+      StatefulShellRoute.indexedStack(
+        parentNavigatorKey: _rootKey,
+        builder: (context, state, shell) =>
+            PassengerShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _passengerKey,
+            routes: [
+              GoRoute(
+                path: '/passenger/home',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const PassengerHomeScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/passenger/activity',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const PassengerActivityScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/passenger/promo',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const PassengerPromoScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/passenger/support',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const PassengerSupportScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/passenger/profile',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const PassengerProfileScreen(),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
+
+      // ── Driver shell — 5 tabs ─────────────────────────────────────
+      StatefulShellRoute.indexedStack(
+        parentNavigatorKey: _rootKey,
+        builder: (context, state, shell) =>
+            DriverShell(navigationShell: shell),
+        branches: [
+          StatefulShellBranch(
+            navigatorKey: _driverKey,
+            routes: [
+              GoRoute(
+                path: '/driver/home',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const DriverHomeScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/driver/earnings',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const DriverEarningsScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/driver/wallet',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const DriverWalletScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/driver/performance',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const DriverPerformanceScreen(),
+                ),
+              ),
+            ],
+          ),
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/driver/profile',
+                pageBuilder: (context, state) => _noTransition(
+                  state: state,
+                  child: const DriverProfileScreen(),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+
+      // ── Modal routes (NO bottom tab) ─────────────────────────────
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/passenger/search',
         pageBuilder: (context, state) =>
             _slideUpPage(state: state, child: const PassengerSearchScreen()),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/passenger/ride-options',
         pageBuilder: (context, state) =>
             _slideUpPage(state: state, child: const RideOptionsScreen()),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/passenger/matching',
         pageBuilder: (context, state) {
           final extra =
@@ -75,6 +217,7 @@ GoRouter router(Ref ref) {
         },
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/passenger/live-trip/:tripId',
         pageBuilder: (context, state) => _fadeScalePage(
           state: state,
@@ -82,6 +225,7 @@ GoRouter router(Ref ref) {
         ),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/passenger/trip-summary/:tripId',
         pageBuilder: (context, state) => _slideUpPage(
           state: state,
@@ -89,11 +233,7 @@ GoRouter router(Ref ref) {
         ),
       ),
       GoRoute(
-        path: '/driver/home',
-        pageBuilder: (context, state) =>
-            _fadeScalePage(state: state, child: const DriverHomeScreen()),
-      ),
-      GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/driver/navigation/:tripId',
         pageBuilder: (context, state) => _fadeScalePage(
           state: state,
@@ -103,6 +243,7 @@ GoRouter router(Ref ref) {
         ),
       ),
       GoRoute(
+        parentNavigatorKey: _rootKey,
         path: '/driver/trip-completed/:tripId',
         pageBuilder: (context, state) => _slideUpPage(
           state: state,
@@ -111,32 +252,21 @@ GoRouter router(Ref ref) {
           ),
         ),
       ),
-      GoRoute(
-        path: '/driver/earnings',
-        pageBuilder: (context, state) =>
-            _slideUpPage(state: state, child: const DriverEarningsScreen()),
-      ),
-      GoRoute(
-        path: '/driver/wallet',
-        pageBuilder: (context, state) =>
-            _slideUpPage(state: state, child: const DriverWalletScreen()),
-      ),
-      GoRoute(
-        path: '/driver/performance',
-        pageBuilder: (context, state) =>
-            _slideUpPage(state: state, child: const DriverPerformanceScreen()),
-      ),
+
       if (kDebugMode) ...[
         GoRoute(
+          parentNavigatorKey: _rootKey,
           path: '/showcase',
           builder: (context, state) => const ShowcaseScreen(),
         ),
         GoRoute(
+          parentNavigatorKey: _rootKey,
           path: '/dev/matching-test',
           pageBuilder: (context, state) =>
               _slideUpPage(state: state, child: const MatchingTestScreen()),
         ),
         GoRoute(
+          parentNavigatorKey: _rootKey,
           path: '/dev/seed',
           pageBuilder: (context, state) =>
               _slideUpPage(state: state, child: const SeedScreen()),
@@ -147,6 +277,20 @@ GoRouter router(Ref ref) {
       appBar: AppBar(title: const Text('Không tìm thấy')),
       body: Center(child: Text('Route không tồn tại: ${state.uri}')),
     ),
+  );
+}
+
+/// No transition — used for shell tab branches so switching tabs is instant.
+CustomTransitionPage<T> _noTransition<T>({
+  required GoRouterState state,
+  required Widget child,
+}) {
+  return CustomTransitionPage<T>(
+    key: state.pageKey,
+    child: child,
+    transitionDuration: Duration.zero,
+    reverseTransitionDuration: Duration.zero,
+    transitionsBuilder: (_, _, _, child) => child,
   );
 }
 

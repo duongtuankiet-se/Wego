@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+
 import 'app_colors.dart';
+import 'app_radius.dart';
 import 'app_typography.dart';
 
 class AppTheme {
@@ -23,45 +25,47 @@ class AppTheme {
       primaryColor: AppColors.primary500,
       splashFactory: InkRipple.splashFactory,
       appBarTheme: const AppBarTheme(
-        backgroundColor: AppColors.white,
+        backgroundColor: Colors.transparent,
+        surfaceTintColor: Colors.transparent,
         foregroundColor: AppColors.ink900,
         elevation: 0,
         scrolledUnderElevation: 0,
         centerTitle: false,
         titleTextStyle: TextStyle(
           fontSize: 18,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
           color: AppColors.ink900,
+          letterSpacing: -0.2,
         ),
         iconTheme: IconThemeData(color: AppColors.ink900),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
-        fillColor: AppColors.ink100,
+        fillColor: AppColors.ink50,
         contentPadding: const EdgeInsets.symmetric(
           horizontal: 16,
           vertical: 16,
         ),
-        hintStyle: AppTypography.body.copyWith(color: AppColors.ink500),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+        hintStyle: AppTypography.body.copyWith(color: AppColors.ink400),
+        border: const OutlineInputBorder(
+          borderRadius: AppRadius.input,
           borderSide: BorderSide.none,
         ),
-        enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
+        enabledBorder: const OutlineInputBorder(
+          borderRadius: AppRadius.input,
           borderSide: BorderSide.none,
         ),
-        focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.primary500, width: 2),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: AppRadius.input,
+          borderSide: BorderSide(color: AppColors.primary500, width: 2),
         ),
-        errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.danger, width: 1.5),
+        errorBorder: const OutlineInputBorder(
+          borderRadius: AppRadius.input,
+          borderSide: BorderSide(color: AppColors.danger, width: 1.5),
         ),
-        focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(14),
-          borderSide: const BorderSide(color: AppColors.danger, width: 2),
+        focusedErrorBorder: const OutlineInputBorder(
+          borderRadius: AppRadius.input,
+          borderSide: BorderSide(color: AppColors.danger, width: 2),
         ),
       ),
       elevatedButtonTheme: ElevatedButtonThemeData(
@@ -69,11 +73,13 @@ class AppTheme {
           backgroundColor: AppColors.primary500,
           foregroundColor: AppColors.white,
           elevation: 0,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 14),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(16),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+          shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+          textStyle: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            letterSpacing: -0.1,
           ),
-          textStyle: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
@@ -94,6 +100,13 @@ class AppTheme {
       ),
       progressIndicatorTheme: const ProgressIndicatorThemeData(
         color: AppColors.primary500,
+      ),
+      bottomNavigationBarTheme: const BottomNavigationBarThemeData(
+        backgroundColor: AppColors.white,
+        selectedItemColor: AppColors.primary500,
+        unselectedItemColor: AppColors.ink400,
+        type: BottomNavigationBarType.fixed,
+        elevation: 0,
       ),
     );
   }

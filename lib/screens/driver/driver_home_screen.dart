@@ -139,8 +139,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     });
 
     final mq = MediaQuery.of(context);
-    const panelMin = 280.0;
-    final panelMax = mq.size.height * 0.78;
+    const panelMin = 96.0;
+    final panelMax = mq.size.height * 0.85;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -149,8 +149,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           SlidingUpPanel(
             minHeight: panelMin,
             maxHeight: panelMax,
+            defaultPanelState: PanelState.OPEN,
+            snapPoint: 0.5,
+            parallaxEnabled: true,
+            parallaxOffset: 0.4,
             color: AppColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
             backdropEnabled: true,
             backdropOpacity: 0.25,
             boxShadow: const [
@@ -160,7 +164,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 offset: Offset(0, -4),
               ),
             ],
-            panelBuilder: (sc) => _Panel(scrollController: sc),
+            panelBuilder: (sc) =>
+                _Panel(scrollController: sc, statsAsync: statsAsync),
             body: _MapBody(controller: _map, driverPos: loc),
           ),
           Positioned(
@@ -183,19 +188,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           ),
           Positioned(
             right: 16,
-            bottom: panelMin + 88,
+            bottom: panelMin + 16,
             child: _RecenterFab(
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _map.move(loc, 14);
               },
             ),
-          ),
-          Positioned(
-            left: 20,
-            right: 20,
-            bottom: panelMin + 16,
-            child: _StatsBridge(stats: statsAsync),
           ),
         ],
       ),
@@ -432,26 +431,10 @@ class _RecenterFab extends StatelessWidget {
   }
 }
 
-class _StatsBridge extends ConsumerWidget {
-  const _StatsBridge({required this.stats});
-  final AsyncValue stats;
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final s = stats.valueOrNull;
-    final earnings = s?.earningsVnd ?? 0;
-    final tripCount = s?.tripCount ?? 0;
-    final activeMin = s?.activeMinutes ?? 0;
-    final rating = s?.ratingAvg ?? 0.0;
-    return GestureDetector(
-      onTap: () => context.push('/driver/earnings'),
-      child: DriverStatsStrip(
-        earningsLabel: _short(earnings),
-        tripCount: tripCount,
-        activeLabel: _duration(activeMin),
-        rating: rating,
-      ),
-    );
-  }
+class _Panel extends ConsumerWidget {
+  const _Panel({required this.scrollController, required this.statsAsync});
+  final ScrollController scrollController;
+  final AsyncValue statsAsync;
 
   String _short(int vnd) {
     if (vnd == 0) return '0đ';
@@ -466,15 +449,10 @@ class _StatsBridge extends ConsumerWidget {
     final m = minutes % 60;
     return h == 0 ? '${m}p' : '${h}h${m}p';
   }
-}
-
-class _Panel extends ConsumerWidget {
-  const _Panel({required this.scrollController});
-  final ScrollController scrollController;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final stats = ref.watch(driverTodayStatsProvider).valueOrNull;
+    final stats = statsAsync.valueOrNull;
     final completedToday = stats?.tripCount ?? 0;
 
     return ListView(
@@ -492,7 +470,24 @@ class _Panel extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 14),
+        const SizedBox(height: 16),
+        // Stats strip inside the panel header so it never overlaps the
+        // map FAB or the hotspot cards below.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: GestureDetector(
+            onTap: () => context.push('/driver/earnings'),
+            child: DriverStatsStrip(
+              earningsLabel: _short(stats?.earningsVnd ?? 0),
+              tripCount: stats?.tripCount ?? 0,
+              activeLabel: _duration(stats?.activeMinutes ?? 0),
+              rating: stats?.ratingAvg ?? 0.0,
+            ),
+          ),
+        ),
+        const SizedBox(height: 20),
+        const Divider(height: 1, color: AppColors.ink100),
+        const SizedBox(height: 16),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Text(
