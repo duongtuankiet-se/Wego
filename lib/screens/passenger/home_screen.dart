@@ -60,7 +60,8 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
   void _openSearch() async {
     final picked = await context.push<Place>('/passenger/search');
     if (picked != null && mounted) {
-      WgToast.success(context, 'Đã chọn: ${picked.name}');
+      // Search screen already sets selectedDestinationProvider — just navigate.
+      context.push('/passenger/ride-options');
     }
   }
 
@@ -68,7 +69,7 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     HapticFeedback.lightImpact();
     ref.read(selectedDestinationProvider.notifier).set(place);
     ref.read(recentDestinationsProvider.notifier).add(place);
-    WgToast.success(context, 'Đã chọn: ${place.name}');
+    context.push('/passenger/ride-options');
   }
 
   @override
