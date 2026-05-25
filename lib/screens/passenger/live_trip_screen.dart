@@ -2,20 +2,19 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/wg_chip.dart';
-import '../../core/widgets/wg_map_pin.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/trip.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/trip_service_provider.dart';
+import '../../services/directions_service.dart';
 import '_widgets/driver_info_card.dart';
 import '_widgets/route_summary_card.dart';
 import '_widgets/trip_status_pill.dart';
@@ -36,7 +35,7 @@ enum _LivePhase {
 
 class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     with TickerProviderStateMixin {
-  final MapController _map = MapController();
+  GoogleMapController? _map;
   late final AnimationController _carAnim;
   Timer? _phaseTimer;
   _LivePhase _phase = _LivePhase.driverArriving;
@@ -46,6 +45,10 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   LatLng? _carPos;
   late LatLng _legStart;
   late LatLng _legEnd;
+
+  /// Real-route polyline from Google Directions (pickup → dropoff).
+  /// Null until the API call returns; UI falls back to a straight line.
+  List<LatLng>? _routePoints;
 
   @override
   void initState() {
@@ -63,6 +66,33 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     _carAnim.forward();
 
     _phaseTimer = Timer(const Duration(seconds: 8), _phaseArrived);
+    _fetchRoute(); // pre-compute pickup→dropoff polyline in background
+  }
+
+  void _fitBounds(LatLng pickup, LatLng dropoff, LatLng car) {
+    final lats = [pickup.latitude, dropoff.latitude, car.latitude];
+    final lngs = [pickup.longitude, dropoff.longitude, car.longitude];
+    final bounds = LatLngBounds(
+      southwest: LatLng(lats.reduce((a, b) => a < b ? a : b),
+          lngs.reduce((a, b) => a < b ? a : b)),
+      northeast: LatLng(lats.reduce((a, b) => a > b ? a : b),
+          lngs.reduce((a, b) => a > b ? a : b)),
+    );
+    Future.delayed(const Duration(milliseconds: 350), () {
+      _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    });
+  }
+
+  Future<void> _fetchRoute() async {
+    final trip = ref.read(currentTripProvider);
+    if (trip == null) return;
+    final route = await DirectionsService.getRoute(
+      origin: LatLng(trip.trip.pickupLat, trip.trip.pickupLng),
+      destination: LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng),
+    );
+    if (mounted && route != null) {
+      setState(() => _routePoints = route.points);
+    }
   }
 
   void _updateCar() {
@@ -152,7 +182,7 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     _carAnim
       ..removeListener(_updateCar)
       ..dispose();
-    _map.dispose();
+    _map?.dispose();
     super.dispose();
   }
 
@@ -239,11 +269,14 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
               onCancel: _cancelTrip,
             ),
             body: _MapBody(
-              mapController: _map,
+              onMapCreated: (c) {
+                _map = c;
+                _fitBounds(pickup, dropoff, carPos);
+              },
               pickup: pickup,
               dropoff: dropoff,
               carPos: carPos,
-              showPickupPulse: _phase != _LivePhase.inTransit,
+              routePoints: _routePoints ?? <LatLng>[pickup, dropoff],
             ),
           ),
           Positioned(
@@ -275,137 +308,61 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
 
 class _MapBody extends StatelessWidget {
   const _MapBody({
-    required this.mapController,
+    required this.onMapCreated,
     required this.pickup,
     required this.dropoff,
     required this.carPos,
-    required this.showPickupPulse,
+    required this.routePoints,
   });
 
-  final MapController mapController;
+  final ValueChanged<GoogleMapController> onMapCreated;
   final LatLng pickup;
   final LatLng dropoff;
   final LatLng carPos;
-  final bool showPickupPulse;
+  final List<LatLng> routePoints;
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: mapController,
-      options: MapOptions(
-        initialCameraFit: CameraFit.bounds(
-          bounds: LatLngBounds.fromPoints([pickup, dropoff, carPos]),
-          padding: const EdgeInsets.fromLTRB(40, 100, 40, 360),
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(target: pickup, zoom: 14),
+      onMapCreated: onMapCreated,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      polylines: <Polyline>{
+        Polyline(
+          polylineId: const PolylineId('route'),
+          points: routePoints,
+          color: AppColors.primary500,
+          width: 5,
         ),
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
-        ),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'vn.exe.wego',
-          maxZoom: 19,
-        ),
-        PolylineLayer(
-          polylines: [
-            Polyline(
-              points: [pickup, dropoff],
-              color: AppColors.primary500,
-              strokeWidth: 4.5,
-            ),
-          ],
-        ),
-        MarkerLayer(
-          markers: [
-            if (showPickupPulse)
-              Marker(
-                point: pickup,
-                width: 60,
-                height: 60,
-                child: const WgMapPin(),
-              )
-            else
-              Marker(point: pickup, width: 22, height: 22, child: _OriginDot()),
-            Marker(
-              point: dropoff,
-              width: 22,
-              height: 22,
-              child: _DestinationDot(),
-            ),
-            Marker(
-              point: carPos,
-              width: 44,
-              height: 44,
-              child: const _CarMarker(),
-            ),
-          ],
-        ),
-        RichAttributionWidget(
-          alignment: AttributionAlignment.bottomLeft,
-          showFlutterMapAttribution: false,
-          attributions: [
-            TextSourceAttribution(
-              '© OpenStreetMap',
-              textStyle: AppTypography.micro.copyWith(color: AppColors.ink700),
-              onTap: () {},
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _CarMarker extends StatelessWidget {
-  const _CarMarker();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary500, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink900.withValues(alpha: 0.18),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
+      },
+      markers: <Marker>{
+        Marker(
+          markerId: const MarkerId('pickup'),
+          position: pickup,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueGreen,
           ),
-        ],
-      ),
-      padding: const EdgeInsets.all(6),
-      child: const Icon(
-        Icons.directions_car_rounded,
-        color: AppColors.primary500,
-        size: 22,
-      ),
-    );
-  }
-}
-
-class _OriginDot extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.success,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 3),
-      ),
-    );
-  }
-}
-
-class _DestinationDot extends StatelessWidget {
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.danger,
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: AppColors.white, width: 3),
-      ),
+        ),
+        Marker(
+          markerId: const MarkerId('dropoff'),
+          position: dropoff,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueRed,
+          ),
+        ),
+        Marker(
+          markerId: const MarkerId('driver'),
+          position: carPos,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
+          rotation: 0,
+        ),
+      },
     );
   }
 }

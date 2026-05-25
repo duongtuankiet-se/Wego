@@ -1,16 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
 import '../../core/widgets/wg_chip.dart';
-import '../../core/widgets/wg_map_pin.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_places.dart';
 import '../../models/place.dart';
@@ -29,7 +27,7 @@ class PassengerHomeScreen extends ConsumerStatefulWidget {
 
 class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
     with TickerProviderStateMixin {
-  final MapController _map = MapController();
+  GoogleMapController? _map;
   late final AnimationController _greetingCtrl;
 
   @override
@@ -47,13 +45,13 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
   @override
   void dispose() {
     _greetingCtrl.dispose();
-    _map.dispose();
+    _map?.dispose();
     super.dispose();
   }
 
   void _recenter(LatLng pos) {
     HapticFeedback.mediumImpact();
-    _map.move(pos, 15);
+    _map?.animateCamera(CameraUpdate.newLatLngZoom(pos, 15));
   }
 
   void _openSearch() async {
@@ -115,7 +113,10 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
               onShortcutTap: _quickPickShortcut,
               onRecentTap: _quickPickShortcut,
             ),
-            body: _MapBody(controller: _map, center: loc),
+            body: _MapBody(
+              onMapCreated: (c) => _map = c,
+              center: loc,
+            ),
           ),
           // Floating top buttons (above panel + map)
           Positioned(
@@ -148,40 +149,31 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
 }
 
 class _MapBody extends StatelessWidget {
-  const _MapBody({required this.controller, required this.center});
-  final MapController controller;
+  const _MapBody({required this.onMapCreated, required this.center});
+  final ValueChanged<GoogleMapController> onMapCreated;
   final LatLng center;
 
   @override
   Widget build(BuildContext context) {
-    return FlutterMap(
-      mapController: controller,
-      options: MapOptions(
-        initialCenter: center,
-        initialZoom: 15,
-        minZoom: 4,
-        maxZoom: 19,
-        interactionOptions: const InteractionOptions(
-          flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+    return GoogleMap(
+      initialCameraPosition: CameraPosition(target: center, zoom: 15),
+      onMapCreated: onMapCreated,
+      myLocationEnabled: false,
+      myLocationButtonEnabled: false,
+      zoomControlsEnabled: false,
+      mapToolbarEnabled: false,
+      compassEnabled: false,
+      rotateGesturesEnabled: false,
+      tiltGesturesEnabled: false,
+      markers: <Marker>{
+        Marker(
+          markerId: const MarkerId('me'),
+          position: center,
+          icon: BitmapDescriptor.defaultMarkerWithHue(
+            BitmapDescriptor.hueAzure,
+          ),
         ),
-      ),
-      children: [
-        TileLayer(
-          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-          userAgentPackageName: 'vn.exe.wego',
-          maxZoom: 19,
-        ),
-        MarkerLayer(
-          markers: [
-            Marker(
-              point: center,
-              width: 60,
-              height: 60,
-              child: const WgMapPin(),
-            ),
-          ],
-        ),
-      ],
+      },
     );
   }
 }

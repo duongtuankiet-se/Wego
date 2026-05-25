@@ -1,8 +1,22 @@
+import java.util.Properties
+import java.io.FileInputStream
+
 plugins {
     id("com.android.application")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
 }
+
+// Load secrets from android/local.properties (gitignored).
+val localProperties = Properties().apply {
+    val f = rootProject.file("local.properties")
+    if (f.exists()) {
+        FileInputStream(f).use { load(it) }
+    }
+}
+val mapsApiKey: String = localProperties.getProperty("MAPS_API_KEY")
+    ?: System.getenv("MAPS_API_KEY")
+    ?: ""
 
 android {
     namespace = "com.example.exe"
@@ -19,10 +33,14 @@ android {
         applicationId = "com.example.exe"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
+        // Google Maps SDK Android requires minSdk >= 21.
+        minSdk = maxOf(flutter.minSdkVersion, 21)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // Injected into AndroidManifest <meta-data android:name="com.google.android.geo.API_KEY" .../>
+        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

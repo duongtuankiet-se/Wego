@@ -2,10 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:flutter_map/flutter_map.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:latlong2/latlong.dart';
+import 'package:google_maps_flutter/google_maps_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -17,6 +16,7 @@ import '../../data/turn_instructions.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/driver_provider.dart';
 import '../../providers/driver_service_provider.dart';
+import '../../services/directions_service.dart';
 import '_widgets/navigation_instruction_card.dart';
 
 class DriverNavigationScreen extends ConsumerStatefulWidget {
@@ -31,7 +31,7 @@ enum _Phase { toPickup, arrived, toDropoff }
 
 class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     with TickerProviderStateMixin {
-  final MapController _map = MapController();
+  GoogleMapController? _map;
   late final AnimationController _carAnim;
   Timer? _phaseTimer;
   Timer? _instructionTimer;
@@ -43,6 +43,10 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   late LatLng _legEnd;
   bool _navigated = false;
   bool _muted = false;
+
+  /// Real-route polyline for the active leg (driver→pickup or
+  /// pickup→dropoff). Refreshed each phase transition.
+  List<LatLng>? _routePoints;
 
   @override
   void initState() {
@@ -129,7 +133,10 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
       _legStart = LatLng(trip.trip.pickupLat, trip.trip.pickupLng);
       _legEnd = LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
       _carPos = _legStart;
+      _routePoints = null; // recompute for the new leg
     });
+    _refreshRoute();
+    _fitBounds(_legStart, _legEnd);
     _carAnim
       ..duration = const Duration(seconds: 12)
       ..reset()
@@ -165,8 +172,38 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     _carAnim
       ..removeListener(_tickCar)
       ..dispose();
-    _map.dispose();
+    _map?.dispose();
     super.dispose();
+  }
+
+  Future<void> _refreshRoute() async {
+    final start = _legStart;
+    final end = _legEnd;
+    final route = await DirectionsService.getRoute(
+      origin: start,
+      destination: end,
+    );
+    if (mounted && route != null) {
+      setState(() => _routePoints = route.points);
+    } else if (mounted) {
+      setState(() => _routePoints = null);
+    }
+  }
+
+  void _fitBounds(LatLng a, LatLng b) {
+    final bounds = LatLngBounds(
+      southwest: LatLng(
+        a.latitude < b.latitude ? a.latitude : b.latitude,
+        a.longitude < b.longitude ? a.longitude : b.longitude,
+      ),
+      northeast: LatLng(
+        a.latitude > b.latitude ? a.latitude : b.latitude,
+        a.longitude > b.longitude ? a.longitude : b.longitude,
+      ),
+    );
+    Future.delayed(const Duration(milliseconds: 300), () {
+      _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    });
   }
 
   @override
@@ -178,82 +215,60 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     final pickup = LatLng(trip.trip.pickupLat, trip.trip.pickupLng);
     final dropoff = LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
     final carPos = _carPos ?? pickup;
-    final fitBounds = _phase == _Phase.toDropoff
-        ? LatLngBounds.fromPoints([carPos, dropoff])
-        : LatLngBounds.fromPoints([carPos, pickup]);
 
     final progress = _carAnim.value;
+    final polyEnd = _phase == _Phase.toDropoff ? dropoff : pickup;
+    final polyPoints = _routePoints ?? <LatLng>[carPos, polyEnd];
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: Stack(
         children: [
-          FlutterMap(
-            mapController: _map,
-            options: MapOptions(
-              initialCameraFit: CameraFit.bounds(
-                bounds: fitBounds,
-                padding: const EdgeInsets.fromLTRB(40, 200, 40, 320),
+          GoogleMap(
+            initialCameraPosition: CameraPosition(target: carPos, zoom: 14),
+            onMapCreated: (c) {
+              _map = c;
+              _fitBounds(carPos, polyEnd);
+              _refreshRoute();
+            },
+            myLocationButtonEnabled: false,
+            zoomControlsEnabled: false,
+            mapToolbarEnabled: false,
+            rotateGesturesEnabled: false,
+            tiltGesturesEnabled: false,
+            polylines: <Polyline>{
+              Polyline(
+                polylineId: const PolylineId('leg'),
+                points: polyPoints,
+                color: _phase == _Phase.toDropoff
+                    ? AppColors.primary500
+                    : AppColors.ink500,
+                width: 5,
               ),
-              interactionOptions: const InteractionOptions(
-                flags: InteractiveFlag.all & ~InteractiveFlag.rotate,
+            },
+            markers: <Marker>{
+              Marker(
+                markerId: const MarkerId('pickup'),
+                position: pickup,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueGreen,
+                ),
               ),
-            ),
-            children: [
-              TileLayer(
-                urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-                userAgentPackageName: 'vn.exe.wego',
-                maxZoom: 19,
+              Marker(
+                markerId: const MarkerId('dropoff'),
+                position: dropoff,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueRed,
+                ),
               ),
-              PolylineLayer(
-                polylines: [
-                  Polyline(
-                    points: _phase == _Phase.toDropoff
-                        ? [pickup, dropoff]
-                        : [carPos, pickup],
-                    color: _phase == _Phase.toDropoff
-                        ? AppColors.primary500
-                        : AppColors.ink500,
-                    strokeWidth: 4.5,
-                  ),
-                ],
+              Marker(
+                markerId: const MarkerId('driver'),
+                position: carPos,
+                icon: BitmapDescriptor.defaultMarkerWithHue(
+                  BitmapDescriptor.hueAzure,
+                ),
               ),
-              MarkerLayer(
-                markers: [
-                  Marker(
-                    point: pickup,
-                    width: 22,
-                    height: 22,
-                    child: _Dot(color: AppColors.success, circle: true),
-                  ),
-                  Marker(
-                    point: dropoff,
-                    width: 22,
-                    height: 22,
-                    child: _Dot(color: AppColors.danger, circle: false),
-                  ),
-                  Marker(
-                    point: carPos,
-                    width: 44,
-                    height: 44,
-                    child: const _CarMarker(),
-                  ),
-                ],
-              ),
-              RichAttributionWidget(
-                alignment: AttributionAlignment.bottomRight,
-                showFlutterMapAttribution: false,
-                attributions: [
-                  TextSourceAttribution(
-                    '© OpenStreetMap',
-                    textStyle: AppTypography.micro.copyWith(
-                      color: AppColors.ink700,
-                    ),
-                    onTap: () {},
-                  ),
-                ],
-              ),
-            ],
+            },
           ),
           // Top: instruction card
           Positioned(
@@ -292,7 +307,9 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
                   iconColor: AppColors.primary500,
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    _map.move(carPos, 16);
+                    _map?.animateCamera(
+                      CameraUpdate.newLatLngZoom(carPos, 16),
+                    );
                   },
                 ),
               ],
@@ -331,49 +348,6 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   );
 }
 
-class _Dot extends StatelessWidget {
-  const _Dot({required this.color, required this.circle});
-  final Color color;
-  final bool circle;
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: color,
-        shape: circle ? BoxShape.circle : BoxShape.rectangle,
-        borderRadius: circle ? null : BorderRadius.circular(4),
-        border: Border.all(color: AppColors.white, width: 3),
-      ),
-    );
-  }
-}
-
-class _CarMarker extends StatelessWidget {
-  const _CarMarker();
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.primary500, width: 2),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink900.withValues(alpha: 0.2),
-            blurRadius: 10,
-            offset: const Offset(0, 3),
-          ),
-        ],
-      ),
-      padding: const EdgeInsets.all(8),
-      child: const Icon(
-        Icons.directions_car_rounded,
-        color: AppColors.primary500,
-        size: 22,
-      ),
-    );
-  }
-}
 
 class _SpeedLimitBadge extends StatelessWidget {
   @override
