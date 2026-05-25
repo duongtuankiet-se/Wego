@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import 'models/user.dart';
+import 'screens/_dev/matching_test_screen.dart';
+import 'screens/_dev/seed_screen.dart';
 import 'screens/_dev/showcase_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/role_select_screen.dart';
@@ -124,11 +126,22 @@ GoRouter router(Ref ref) {
         pageBuilder: (context, state) =>
             _slideUpPage(state: state, child: const DriverPerformanceScreen()),
       ),
-      if (kDebugMode)
+      if (kDebugMode) ...[
         GoRoute(
           path: '/showcase',
           builder: (context, state) => const ShowcaseScreen(),
         ),
+        GoRoute(
+          path: '/dev/matching-test',
+          pageBuilder: (context, state) =>
+              _slideUpPage(state: state, child: const MatchingTestScreen()),
+        ),
+        GoRoute(
+          path: '/dev/seed',
+          pageBuilder: (context, state) =>
+              _slideUpPage(state: state, child: const SeedScreen()),
+        ),
+      ],
     ],
     errorBuilder: (context, state) => Scaffold(
       appBar: AppBar(title: const Text('Không tìm thấy')),

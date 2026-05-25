@@ -29,20 +29,21 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
     with TickerProviderStateMixin {
   late final AnimationController _pulse;
   late final AnimationController _orbit;
-  Timer? _stepTimer;
-  int _activeStep = 0; // 0-3 (0..2 are running, 3 = all done)
+  int _activeStep = 0;
   bool _completed = false;
   Object? _error;
+  String? _carpoolHostName; // populated when a carpool match is found
 
-  static const _steps = [
-    'Phân tích tuyến đường',
-    'Tìm hành khách cùng hướng',
-    'Chọn tài xế tốt nhất',
-  ];
+  late final List<String> _stepLabels;
 
   @override
   void initState() {
     super.initState();
+    _stepLabels = [
+      'Phân tích tuyến đường',
+      'Tìm hành khách cùng hướng',
+      'Chọn tài xế gần nhất',
+    ];
     _pulse = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1800),
@@ -56,24 +57,17 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
 
   @override
   void dispose() {
-    _stepTimer?.cancel();
     _pulse.dispose();
     _orbit.dispose();
     super.dispose();
   }
 
-  void _runFlow() {
-    _stepTimer = Timer.periodic(const Duration(milliseconds: 1500), (t) {
-      if (!mounted) return;
-      setState(() => _activeStep++);
-      if (_activeStep >= _steps.length) {
-        t.cancel();
-        _finalize();
-      }
-    });
-  }
-
-  Future<void> _finalize() async {
+  /// 4-phase flow tied to real Mongo writes:
+  ///   T=0   insert trip status=pending
+  ///   T=1.5 try findCarpoolMatch → joinCarpool if hit
+  ///   T=3.0 dispatch nearest driver → status=accepted
+  ///   T=4.5 navigate to live-trip
+  Future<void> _runFlow() async {
     try {
       final user = ref.read(authStateProvider).valueOrNull;
       if (user == null) {
@@ -92,9 +86,11 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
         lng: widget.extra['pickupLng'] as double,
       );
       final type = TripType.values.byName(widget.extra['type'] as String);
-
       final tripService = ref.read(tripServiceProvider);
-      final active = await tripService.createTrip(
+
+      // Phase 1 — analyze (T=0 → 1.5s)
+      setState(() => _activeStep = 0);
+      final tripId = await tripService.insertPendingTrip(
         passengerId: user.id,
         pickup: pickup,
         dropoff: dropoff,
@@ -103,13 +99,66 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
         distanceKm: widget.extra['distanceKm'] as double,
         durationMin: widget.extra['durationMin'] as int,
       );
-
+      await Future.delayed(const Duration(milliseconds: 1500));
       if (!mounted) return;
-      ref.read(currentTripProvider.notifier).set(active);
-      setState(() => _completed = true);
 
-      // Brief pause so the user sees the final check before navigating.
-      await Future.delayed(const Duration(milliseconds: 500));
+      // Phase 2 — carpool (T=1.5 → 3s)
+      setState(() => _activeStep = 1);
+      String activeTripId = tripId;
+      bool carpooled = false;
+      if (type == TripType.shared) {
+        final host = await tripService.findCarpoolMatch(
+          pickupLat: pickup.lat,
+          pickupLng: pickup.lng,
+          dropoffLat: dropoff.lat,
+          dropoffLng: dropoff.lng,
+          currentPassengerId: user.id,
+        );
+        if (host != null) {
+          await tripService.joinCarpool(
+            hostTripId: (host['_id'] as dynamic).oid as String,
+            newPassengerId: user.id,
+          );
+          activeTripId = (host['_id'] as dynamic).oid as String;
+          carpooled = true;
+          if (mounted) {
+            // Step 2 label gets a richer message when matched.
+            setState(() {
+              _carpoolHostName = 'hành khách khác';
+              _stepLabels[1] = '✓ Đã ghép cùng tuyến với ${_carpoolHostName!}';
+            });
+          }
+        }
+      }
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+
+      // Phase 3 — dispatch (T=3 → 4.5s) only if NOT carpooled into a
+      // host that already has a driver assigned.
+      setState(() => _activeStep = 2);
+      ActiveTrip? active;
+      if (carpooled) {
+        // Host trip may already be accepted with a driver. Just load it.
+        active = await tripService.loadActiveTrip(activeTripId);
+      }
+      active ??= await _dispatchOrFallback(
+        tripService: tripService,
+        tripId: activeTripId,
+        pickup: pickup,
+        dropoff: dropoff,
+        type: type,
+        passengerId: user.id,
+      );
+
+      await Future.delayed(const Duration(milliseconds: 1500));
+      if (!mounted) return;
+
+      ref.read(currentTripProvider.notifier).set(active);
+      setState(() {
+        _activeStep = _stepLabels.length;
+        _completed = true;
+      });
+      await Future.delayed(const Duration(milliseconds: 400));
       if (!mounted) return;
       context.go('/passenger/live-trip/${active.tripId}');
     } catch (e) {
@@ -117,6 +166,40 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
       setState(() => _error = e);
       WgToast.error(context, 'Không tạo được chuyến: $e');
     }
+  }
+
+  /// Tries to assign the nearest online driver. If matching engine returns
+  /// nobody, falls back to the Phase 1B mock-driver path so the demo
+  /// never dead-ends.
+  Future<ActiveTrip> _dispatchOrFallback({
+    required dynamic tripService,
+    required String tripId,
+    required Place pickup,
+    required Place dropoff,
+    required TripType type,
+    required String passengerId,
+  }) async {
+    final driverDoc = await tripService.dispatchDriverToTrip(
+      tripId: tripId,
+      pickupLat: pickup.lat,
+      pickupLng: pickup.lng,
+    );
+    if (driverDoc != null) {
+      final active = await tripService.loadActiveTrip(tripId);
+      if (active != null) return active;
+    }
+    // Fallback: legacy mock path — cancels the pending trip and creates
+    // a fresh accepted trip with a random mock driver.
+    await tripService.cancelTrip(tripId);
+    return tripService.createTrip(
+      passengerId: passengerId,
+      pickup: pickup,
+      dropoff: dropoff,
+      type: type,
+      price: widget.extra['price'] as int,
+      distanceKm: widget.extra['distanceKm'] as double,
+      durationMin: widget.extra['durationMin'] as int,
+    );
   }
 
   Future<void> _cancelFlow() async {
@@ -143,7 +226,6 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
         ) ??
         false;
     if (!confirmed || !mounted) return;
-    _stepTimer?.cancel();
     context.go('/passenger/home');
   }
 
@@ -196,7 +278,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                         const SizedBox(height: 32),
                         const Divider(height: 1, color: AppColors.ink100),
                         const SizedBox(height: 20),
-                        ...List.generate(_steps.length, (i) {
+                        ...List.generate(_stepLabels.length, (i) {
                           final status = i < _activeStep
                               ? _StepStatus.done
                               : i == _activeStep
@@ -204,7 +286,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                               : _StepStatus.pending;
                           return Padding(
                             padding: const EdgeInsets.symmetric(vertical: 8),
-                            child: _StepRow(label: _steps[i], status: status),
+                            child: _StepRow(
+                              label: _stepLabels[i],
+                              status: status,
+                            ),
                           );
                         }),
                         const SizedBox(height: 24),

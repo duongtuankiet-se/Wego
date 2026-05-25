@@ -35,6 +35,7 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   late final AnimationController _carAnim;
   Timer? _phaseTimer;
   Timer? _instructionTimer;
+  Timer? _locationTimer;
   _Phase _phase = _Phase.toPickup;
   int _instructionIdx = 0;
   LatLng? _carPos;
@@ -71,6 +72,29 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
             _instructionIdx = (_instructionIdx + 1) % kTurnInstructions.length,
       );
     });
+    // Push driver location to Mongo every 3s so passengers + dispatch
+    // see the car move in near-real-time.
+    _locationTimer = Timer.periodic(const Duration(seconds: 3), (_) {
+      _pushLocation();
+    });
+  }
+
+  Future<void> _pushLocation() async {
+    final pos = _carPos;
+    if (pos == null) return;
+    try {
+      final driver = await ref.read(currentDriverProvider.future);
+      if (driver == null) return;
+      await ref
+          .read(driverServiceProvider)
+          .updateDriverLocation(
+            driverId: driver.id,
+            lat: pos.latitude,
+            lng: pos.longitude,
+          );
+    } catch (_) {
+      // Swallow — periodic push, transient failures are non-fatal.
+    }
   }
 
   void _tickCar() {
@@ -137,6 +161,7 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   void dispose() {
     _phaseTimer?.cancel();
     _instructionTimer?.cancel();
+    _locationTimer?.cancel();
     _carAnim
       ..removeListener(_tickCar)
       ..dispose();
