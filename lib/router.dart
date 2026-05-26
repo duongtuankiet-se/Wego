@@ -21,6 +21,7 @@ import 'screens/driver/driver_trip_completed_screen.dart';
 import 'screens/driver/driver_wallet_screen.dart';
 import 'screens/passenger/home_screen.dart';
 import 'screens/passenger/live_trip_screen.dart';
+import 'screens/passenger/map_picker_screen.dart';
 import 'screens/passenger/matching_screen.dart';
 import 'screens/passenger/passenger_activity_screen.dart';
 import 'screens/passenger/passenger_profile_screen.dart';
@@ -195,6 +196,12 @@ GoRouter router(Ref ref) {
         path: '/passenger/search',
         pageBuilder: (context, state) =>
             _slideUpPage(state: state, child: const PassengerSearchScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/passenger/map-picker',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const MapPickerScreen()),
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

@@ -10,8 +10,8 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
-import '../../core/widgets/wg_chip.dart';
 import '../../core/widgets/wg_toast.dart';
+import '../../data/default_saved_places.dart';
 import '../../models/place.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/places_provider.dart';
@@ -69,6 +69,12 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
     context.pop(place);
   }
 
+  Future<void> _openMapPicker() async {
+    final picked = await context.push<Place>('/passenger/map-picker');
+    if (picked == null || !mounted) return;
+    await _select(picked);
+  }
+
   Future<void> _selectSuggestion(PlaceSuggestion s) async {
     setState(() => _apiLoading = true);
     final details = await PlacesService.getDetails(s.placeId);
@@ -123,27 +129,31 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
             const Divider(height: 1, color: AppColors.ink100),
             const SizedBox(height: 12),
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  WgChip(
-                    label: 'Chọn trên bản đồ',
-                    leadingIcon: PhosphorIconsRegular.mapTrifold,
-                    onTap: () => WgToast.info(context, 'Đang phát triển'),
+                  Flexible(
+                    child: _ActionChip(
+                      icon: PhosphorIconsRegular.mapTrifold,
+                      label: 'Chọn trên bản đồ',
+                      color: AppColors.primary500,
+                      onTap: _openMapPicker,
+                    ),
                   ),
-                  const SizedBox(width: 12),
-                  Opacity(
-                    opacity: 0.5,
-                    child: WgChip(
-                      label: 'Thêm điểm dừng',
-                      leadingIcon: PhosphorIconsRegular.mapPinPlus,
-                      onTap: null,
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: _ActionChip(
+                      icon: PhosphorIconsRegular.mapPinPlus,
+                      label: 'Điểm dừng',
+                      color: AppColors.ink500,
+                      disabled: true,
+                      onTap: () => WgToast.info(context, 'Đang phát triển'),
                     ),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 14),
             Expanded(
               child: query.trim().isEmpty
                   ? _EmptyState(
@@ -226,38 +236,23 @@ class _EmptyState extends StatelessWidget {
     return ListView(
       padding: const EdgeInsets.only(bottom: 24),
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 4, 20, 8),
-          child: Text(
-            'Đã lưu',
-            style: AppTypography.bodyLarge.copyWith(color: AppColors.ink900),
-          ),
+        const _SectionHeader(
+          icon: PhosphorIconsFill.bookmarkSimple,
+          iconColor: AppColors.primary500,
+          title: 'Đã lưu',
         ),
-        _SavedRow(
-          icon: PhosphorIconsRegular.house,
-          title: 'Nhà',
-          subtitle: 'Chưa cài đặt',
-          actionLabel: 'Thêm',
-          onAction: () => _hint(context),
+        ...kDefaultSavedPlaces.map(
+          (sp) => _SavedPlaceRow(savedPlace: sp, onSelect: onSelect),
         ),
-        _SavedRow(
-          icon: PhosphorIconsRegular.briefcase,
-          title: 'Công ty',
-          subtitle: 'Chưa cài đặt',
-          actionLabel: 'Thêm',
-          onAction: () => _hint(context),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 8, 20, 8),
-          child: Text(
-            'Gần đây',
-            style: AppTypography.bodyLarge.copyWith(color: AppColors.ink900),
-          ),
+        const SizedBox(height: 8),
+        const _SectionHeader(
+          icon: PhosphorIconsFill.clockCounterClockwise,
+          iconColor: AppColors.ink500,
+          title: 'Gần đây',
         ),
         if (recent.isEmpty)
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
             child: Text(
               'Chưa có lịch sử. Đặt chuyến đầu tiên để lưu nhé.',
               style: AppTypography.body.copyWith(color: AppColors.ink500),
@@ -280,80 +275,191 @@ class _EmptyState extends StatelessWidget {
       ],
     );
   }
+}
 
-  void _hint(BuildContext context) {
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Tính năng đang phát triển'),
-        duration: Duration(seconds: 2),
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+      child: Row(
+        children: [
+          Icon(icon, size: 16, color: iconColor),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: AppTypography.h3.copyWith(fontWeight: FontWeight.w700),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _SavedRow extends StatelessWidget {
-  const _SavedRow({
+class _ActionChip extends StatelessWidget {
+  const _ActionChip({
     required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.actionLabel,
-    required this.onAction,
+    required this.label,
+    required this.color,
+    required this.onTap,
+    this.disabled = false,
   });
 
   final IconData icon;
-  final String title;
-  final String subtitle;
-  final String actionLabel;
-  final VoidCallback onAction;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+  final bool disabled;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-      child: Row(
-        children: [
-          Container(
-            width: 40,
+    return Opacity(
+      opacity: disabled ? 0.5 : 1.0,
+      child: Material(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
             height: 40,
+            padding: const EdgeInsets.symmetric(horizontal: 12),
             decoration: BoxDecoration(
-              color: AppColors.primary50,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.ink200, width: 1),
             ),
-            child: Icon(icon, color: AppColors.primary700, size: 22),
-          ),
-          const SizedBox(width: 14),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                Text(
-                  title,
-                  style: AppTypography.body.copyWith(
-                    color: AppColors.ink900,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                Text(
-                  subtitle,
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.ink500,
+                Icon(icon, size: 16, color: color),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: Text(
+                    label,
+                    style: AppTypography.caption.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: color,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
               ],
             ),
           ),
-          TextButton(
-            onPressed: onAction,
-            child: Text(
-              actionLabel,
-              style: AppTypography.body.copyWith(
-                color: AppColors.primary500,
-                fontWeight: FontWeight.w600,
+        ),
+      ),
+    );
+  }
+}
+
+class _SavedPlaceRow extends ConsumerWidget {
+  const _SavedPlaceRow({required this.savedPlace, required this.onSelect});
+
+  final SavedPlace savedPlace;
+  final ValueChanged<Place> onSelect;
+
+  Color get _tint {
+    switch (savedPlace.kind) {
+      case SavedPlaceKind.home:
+        return AppColors.primary500;
+      case SavedPlaceKind.work:
+        return AppColors.warning;
+      case SavedPlaceKind.airport:
+        return AppColors.sharedAccent;
+      case SavedPlaceKind.city:
+        return const Color(0xFF8B5CF6);
+    }
+  }
+
+  IconData get _icon {
+    switch (savedPlace.kind) {
+      case SavedPlaceKind.home:
+        return PhosphorIconsFill.house;
+      case SavedPlaceKind.work:
+        return PhosphorIconsFill.briefcase;
+      case SavedPlaceKind.airport:
+        return PhosphorIconsFill.airplane;
+      case SavedPlaceKind.city:
+        return PhosphorIconsFill.buildings;
+    }
+  }
+
+  Future<void> _setupPersonal(BuildContext context) async {
+    final picked = await context.push<Place>('/passenger/map-picker');
+    if (picked == null || !context.mounted) return;
+    // Phase 5C: persistence (saving Home/Work) is intentionally out of
+    // scope — show a toast + treat the picked place as the dropoff so
+    // the booking flow can continue.
+    WgToast.success(context, 'Đã chọn ${savedPlace.label}: ${picked.name}');
+    onSelect(picked);
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final place = savedPlace.place;
+    final hasPlace = place != null;
+    return InkWell(
+      onTap: hasPlace ? () => onSelect(place) : () => _setupPersonal(context),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: _tint.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(_icon, color: _tint, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    savedPlace.label,
+                    style: AppTypography.body.copyWith(
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.ink900,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    hasPlace ? place.address : 'Nhấn để cài đặt',
+                    style: AppTypography.caption.copyWith(
+                      color: hasPlace ? AppColors.ink500 : AppColors.primary500,
+                      fontWeight: hasPlace ? FontWeight.w400 : FontWeight.w600,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
             ),
-          ),
-        ],
+            const SizedBox(width: 8),
+            const Icon(
+              PhosphorIconsRegular.caretRight,
+              size: 14,
+              color: AppColors.ink400,
+            ),
+          ],
+        ),
       ),
     );
   }

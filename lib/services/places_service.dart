@@ -40,6 +40,8 @@ class PlacesService {
       'https://maps.googleapis.com/maps/api/place/autocomplete/json';
   static const _detailsUrl =
       'https://maps.googleapis.com/maps/api/place/details/json';
+  static const _geocodeUrl =
+      'https://maps.googleapis.com/maps/api/geocode/json';
 
   static Future<List<PlaceSuggestion>> autocomplete(String input) async {
     if (input.trim().length < 2) return const [];
@@ -123,6 +125,47 @@ class PlacesService {
       );
     } catch (e) {
       developer.log('details error: $e', name: 'places');
+      return null;
+    }
+  }
+
+  /// Reverse-geocode a coordinate into the best-guess Vietnamese formatted
+  /// address (e.g. "280 Trần Phú, Hải Châu, Đà Nẵng"). Returns `null` on
+  /// network failure or non-OK status; callers should fall back to showing
+  /// the raw lat/lng.
+  static Future<String?> reverseGeocode({
+    required double lat,
+    required double lng,
+  }) async {
+    if (!Env.hasGoogleMapsKey) return null;
+    final uri = Uri.parse(_geocodeUrl).replace(
+      queryParameters: <String, String>{
+        'latlng': '$lat,$lng',
+        'language': 'vi',
+        'result_type': 'street_address|premise|route|neighborhood',
+        'key': Env.googleMapsApiKey,
+      },
+    );
+    try {
+      final res = await http.get(uri).timeout(const Duration(seconds: 6));
+      if (res.statusCode != 200) return null;
+      final body = jsonDecode(res.body) as Map<String, dynamic>;
+      final status = body['status'] as String?;
+      if (status != 'OK') {
+        if (status != 'ZERO_RESULTS') {
+          developer.log(
+            'reverseGeocode status=$status ${body['error_message']}',
+            name: 'places',
+          );
+        }
+        return null;
+      }
+      final results = (body['results'] as List?) ?? const [];
+      if (results.isEmpty) return null;
+      final first = results.first as Map<String, dynamic>;
+      return first['formatted_address'] as String?;
+    } catch (e) {
+      developer.log('reverseGeocode error: $e', name: 'places');
       return null;
     }
   }
