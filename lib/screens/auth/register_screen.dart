@@ -12,6 +12,7 @@ import '../../core/widgets/wg_input.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
+import '_widgets/auth_header.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key, this.initialRole = UserRole.passenger});
@@ -87,15 +88,9 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
             key: _formKey,
             child: ListView(
               children: [
-                const SizedBox(height: 8),
-                Text(
-                  'Tạo tài khoản WeGo',
-                  style: AppTypography.h1.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Đăng ký nhanh với số điện thoại',
-                  style: AppTypography.body.copyWith(color: AppColors.ink500),
+                WgAuthHeader.text(
+                  title: 'Tạo tài khoản WeGo',
+                  subtitle: 'Đăng ký nhanh với số điện thoại',
                 ),
                 const SizedBox(height: 28),
                 WgInput(

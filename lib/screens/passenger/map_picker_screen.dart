@@ -15,12 +15,20 @@ import '../../models/place.dart';
 import '../../providers/location_provider.dart';
 import '../../services/places_service.dart';
 
+/// What kind of location the user is picking. Only affects copy on the
+/// screen — the returned [Place] is identical either way; the caller
+/// decides whether to route it into `selectedDestinationProvider` or
+/// `customPickupProvider`.
+enum MapPickerMode { dropoff, pickup }
+
 /// Full-screen map picker. The center pin is a fixed overlay widget
 /// (NOT a map Marker), so panning moves the map under a stationary pin.
 /// When the camera idles, we debounce 500ms then reverse-geocode the
 /// pin's lat/lng to populate the bottom address card.
 class MapPickerScreen extends ConsumerStatefulWidget {
-  const MapPickerScreen({super.key});
+  const MapPickerScreen({super.key, this.mode = MapPickerMode.dropoff});
+
+  final MapPickerMode mode;
 
   @override
   ConsumerState<MapPickerScreen> createState() => _MapPickerScreenState();
@@ -216,7 +224,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
             top: MediaQuery.of(context).padding.top + 12,
             left: 16,
             right: 16,
-            child: _TopHeader(),
+            child: _TopHeader(mode: widget.mode),
           ),
 
           Positioned(
@@ -230,6 +238,7 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
             left: 0,
             right: 0,
             child: _BottomAddressCard(
+              mode: widget.mode,
               isGeocoding: _isGeocoding,
               hasError: _hasError,
               address: _currentAddress,
@@ -243,6 +252,9 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
 }
 
 class _TopHeader extends StatelessWidget {
+  const _TopHeader({required this.mode});
+  final MapPickerMode mode;
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -277,7 +289,7 @@ class _TopHeader extends StatelessWidget {
           const SizedBox(width: 12),
           Expanded(
             child: Text(
-              'Chọn điểm đến',
+              mode == MapPickerMode.pickup ? 'Chọn điểm đón' : 'Chọn điểm đến',
               style: AppTypography.h3.copyWith(fontWeight: FontWeight.w700),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -323,12 +335,14 @@ class _RecenterFab extends StatelessWidget {
 
 class _BottomAddressCard extends StatelessWidget {
   const _BottomAddressCard({
+    required this.mode,
     required this.isGeocoding,
     required this.hasError,
     required this.address,
     required this.onConfirm,
   });
 
+  final MapPickerMode mode;
   final bool isGeocoding;
   final bool hasError;
   final String? address;
@@ -376,7 +390,9 @@ class _BottomAddressCard extends StatelessWidget {
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Text(
-                      'Điểm đến đã chọn',
+                      mode == MapPickerMode.pickup
+                          ? 'Điểm đón đã chọn'
+                          : 'Điểm đến đã chọn',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.ink500,
                       ),
@@ -406,7 +422,9 @@ class _BottomAddressCard extends StatelessWidget {
           ),
           const SizedBox(height: 16),
           WgButton.primary(
-            label: 'Xác nhận điểm này',
+            label: mode == MapPickerMode.pickup
+                ? 'Xác nhận điểm đón'
+                : 'Xác nhận điểm đến',
             onPressed: isGeocoding ? null : onConfirm,
             isFullWidth: true,
             size: WgButtonSize.lg,

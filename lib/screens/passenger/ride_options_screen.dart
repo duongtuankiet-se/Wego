@@ -12,6 +12,7 @@ import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/place.dart';
 import '../../models/trip.dart';
+import '../../providers/custom_pickup_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/selected_destination_provider.dart';
 import '../../providers/selected_ride_type_provider.dart';
@@ -38,8 +39,8 @@ class RideOptionsScreen extends ConsumerStatefulWidget {
 }
 
 class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
-  /// Stand-in pickup address until reverse-geocoding lands.
-  static const _pickupAddress = 'Vị trí hiện tại';
+  /// Stand-in pickup address when the user hasn't picked a custom one.
+  static const _defaultPickupAddress = 'Vị trí hiện tại';
 
   DirectionsRoute? _route;
   bool _loadingRoute = true;
@@ -81,11 +82,22 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
       return _MissingDropoff();
     }
 
-    final origin =
-        ref.watch(currentLocationProvider).valueOrNull ?? kDanangFallback;
     final selectedType = ref.watch(selectedRideTypeProvider);
+    final customPickup = ref.watch(customPickupProvider);
 
-    final pickup = LatLng(origin.latitude, origin.longitude);
+    // Custom pickup (from "Đi đón khách") wins over GPS so the trip
+    // starts at the friend's location, not the user's phone.
+    final LatLng pickup;
+    final String pickupAddress;
+    if (customPickup != null) {
+      pickup = LatLng(customPickup.lat, customPickup.lng);
+      pickupAddress = customPickup.name;
+    } else {
+      final origin =
+          ref.watch(currentLocationProvider).valueOrNull ?? kDanangFallback;
+      pickup = LatLng(origin.latitude, origin.longitude);
+      pickupAddress = _defaultPickupAddress;
+    }
     final dest = LatLng(dropoff.lat, dropoff.lng);
 
     // Kick off the directions fetch once the first frame is laid out so
@@ -140,6 +152,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
           distanceKm: distanceKm,
           durationMin: durationMin,
           pickupLatLng: pickup,
+          pickupAddress: pickupAddress,
         ),
       ),
       body: SafeArea(
@@ -173,7 +186,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
             ColoredBox(
               color: AppColors.white,
               child: RouteSummaryCard(
-                pickupAddress: _pickupAddress,
+                pickupAddress: pickupAddress,
                 dropoffAddress: dropoff.name,
                 distanceKm: distanceKm,
                 durationMin: durationMin,
@@ -267,17 +280,21 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     required double distanceKm,
     required int durationMin,
     required LatLng pickupLatLng,
+    required String pickupAddress,
   }) {
     final extra = <String, Object>{
       'pickupLat': pickupLatLng.latitude,
       'pickupLng': pickupLatLng.longitude,
-      'pickupAddress': _pickupAddress,
+      'pickupAddress': pickupAddress,
       'dropoffId': dropoff.id,
       'type': type.name,
       'price': price,
       'distanceKm': distanceKm,
       'durationMin': durationMin,
     };
+    // The custom pickup is one-shot per trip — clear it now so the next
+    // trip defaults back to GPS unless the user picks again.
+    ref.read(customPickupProvider.notifier).clear();
     context.push('/passenger/matching', extra: extra);
   }
 }
