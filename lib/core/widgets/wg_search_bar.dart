@@ -30,8 +30,8 @@ class WgSearchBar extends StatelessWidget {
         },
         borderRadius: AppRadius.search,
         child: Container(
-          height: 56,
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          height: 52,
+          padding: const EdgeInsets.symmetric(horizontal: 18),
           decoration: BoxDecoration(
             color: AppColors.white,
             borderRadius: AppRadius.search,
