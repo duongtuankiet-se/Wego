@@ -44,6 +44,14 @@ dev_dependencies:
   freezed: ^2.5.7
   json_serializable: ^6.9.0
 
+# Local patch of phosphor_flutter 2.1.0 for Flutter 3.44+ — upstream
+# 2.1.0 does `class PhosphorIconData extends IconData`, which fails to
+# compile now that `IconData` is a `final class`. See scripts/patch_phosphor.py
+# for the patch (typedef alias + duotone wrapper rewrite).
+dependency_overrides:
+  phosphor_flutter:
+    path: vendor/phosphor_flutter
+
 flutter:
   uses-material-design: true
   assets:
