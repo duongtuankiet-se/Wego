@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -39,8 +40,8 @@ class ReviewCard extends StatelessWidget {
                     5,
                     (i) => Icon(
                       i < review.stars
-                          ? Icons.star_rounded
-                          : Icons.star_outline_rounded,
+                          ? PhosphorIconsFill.star
+                          : PhosphorIconsRegular.star,
                       color: i < review.stars
                           ? AppColors.warning
                           : AppColors.ink300,

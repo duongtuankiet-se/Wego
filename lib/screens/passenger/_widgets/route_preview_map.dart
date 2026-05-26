@@ -31,17 +31,13 @@ class RoutePreviewMap extends StatelessWidget {
     final radius = borderRadius ?? BorderRadius.zero;
     final poly = routePoints ?? <LatLng>[pickup, dropoff];
     final sw = LatLng(
-      pickup.latitude < dropoff.latitude
-          ? pickup.latitude
-          : dropoff.latitude,
+      pickup.latitude < dropoff.latitude ? pickup.latitude : dropoff.latitude,
       pickup.longitude < dropoff.longitude
           ? pickup.longitude
           : dropoff.longitude,
     );
     final ne = LatLng(
-      pickup.latitude > dropoff.latitude
-          ? pickup.latitude
-          : dropoff.latitude,
+      pickup.latitude > dropoff.latitude ? pickup.latitude : dropoff.latitude,
       pickup.longitude > dropoff.longitude
           ? pickup.longitude
           : dropoff.longitude,

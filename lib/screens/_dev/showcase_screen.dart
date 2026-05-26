@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -178,8 +179,8 @@ class _ButtonsDemo extends StatelessWidget {
         WgButton.primary(label: 'Disabled', onPressed: null),
         WgButton.primary(
           label: 'With icons',
-          leadingIcon: Icons.add,
-          trailingIcon: Icons.arrow_forward,
+          leadingIcon: PhosphorIconsRegular.plus,
+          trailingIcon: PhosphorIconsRegular.arrowRight,
           onPressed: () {},
         ),
       ],
@@ -203,7 +204,7 @@ class _InputsDemoState extends State<_InputsDemo> {
           label: 'Phone',
           hint: '0905xxxxxx',
           variant: WgInputVariant.phone,
-          prefixIcon: Icons.phone,
+          prefixIcon: PhosphorIconsFill.phone,
         ),
         const SizedBox(height: 12),
         const WgInput(
@@ -221,7 +222,7 @@ class _InputsDemoState extends State<_InputsDemo> {
         const WgInput(
           label: 'Search',
           hint: 'Tìm địa điểm',
-          prefixIcon: Icons.search,
+          prefixIcon: PhosphorIconsRegular.magnifyingGlass,
         ),
       ],
     );
@@ -256,7 +257,10 @@ class _CardsDemo extends StatelessWidget {
           onTap: () => WgToast.info(context, 'Card tapped'),
           child: Row(
             children: [
-              const Icon(Icons.touch_app, color: AppColors.primary500),
+              const Icon(
+                PhosphorIconsRegular.handTap,
+                color: AppColors.primary500,
+              ),
               const SizedBox(width: 12),
               Text('Tap demo', style: AppTypography.body),
             ],
@@ -278,12 +282,12 @@ class _ChipsDemoState extends State<_ChipsDemo> {
   Widget build(BuildContext context) {
     final labels = ['4 chỗ', '7 chỗ', 'Xe máy', 'Đi ghép', 'Riêng', 'VIP'];
     final icons = [
-      Icons.directions_car,
-      Icons.airport_shuttle,
-      Icons.two_wheeler,
-      Icons.group,
-      Icons.lock,
-      Icons.star,
+      PhosphorIconsFill.car,
+      PhosphorIconsFill.van,
+      PhosphorIconsFill.motorcycle,
+      PhosphorIconsFill.usersThree,
+      PhosphorIconsFill.lock,
+      PhosphorIconsFill.star,
     ];
     return Wrap(
       spacing: 8,
@@ -371,7 +375,7 @@ class _SheetDemo extends StatelessWidget {
   Widget build(BuildContext context) {
     return WgButton.primary(
       label: 'Mở Bottom Sheet',
-      leadingIcon: Icons.arrow_upward,
+      leadingIcon: PhosphorIconsRegular.arrowUp,
       onPressed: () => showWgSheet<void>(
         context: context,
         child: Column(

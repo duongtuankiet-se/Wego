@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 
@@ -107,7 +108,9 @@ class _StarTapState extends State<_StarTap>
           transitionBuilder: (child, anim) =>
               FadeTransition(opacity: anim, child: child),
           child: Icon(
-            widget.selected ? Icons.star_rounded : Icons.star_outline_rounded,
+            widget.selected
+                ? PhosphorIconsFill.star
+                : PhosphorIconsRegular.star,
             key: ValueKey(widget.selected),
             size: widget.size,
             color: widget.selected ? AppColors.warning : AppColors.ink300,

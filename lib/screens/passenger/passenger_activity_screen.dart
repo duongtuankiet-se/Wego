@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -91,8 +92,7 @@ class _PassengerActivityScreenState
           ),
           Expanded(
             child: tripsAsync.when(
-              loading: () =>
-                  const Center(child: CircularProgressIndicator()),
+              loading: () => const Center(child: CircularProgressIndicator()),
               error: (_, _) => WgErrorState(
                 title: 'Không tải được lịch sử',
                 onRetry: () => ref.invalidate(passengerTripsProvider),
@@ -104,7 +104,7 @@ class _PassengerActivityScreenState
                 }).toList();
                 if (list.isEmpty) {
                   return WgEmptyState(
-                    icon: Icons.directions_car_outlined,
+                    icon: PhosphorIconsRegular.car,
                     title: 'Chưa có chuyến đi nào',
                     subtitle: 'Đặt chuyến đầu tiên để bắt đầu hành trình.',
                     ctaLabel: 'Đặt xe ngay',
@@ -243,10 +243,7 @@ class _TripCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (isCancelled)
-                const WgBadge(
-                  label: 'ĐÃ HUỶ',
-                  variant: WgBadgeVariant.surge,
-                ),
+                const WgBadge(label: 'ĐÃ HUỶ', variant: WgBadgeVariant.surge),
               const Spacer(),
               Text(
                 _hhmm(trip.createdAt),
@@ -273,11 +270,7 @@ class _TripCard extends StatelessWidget {
                         shape: BoxShape.circle,
                       ),
                     ),
-                    Container(
-                      width: 1.5,
-                      height: 24,
-                      color: AppColors.ink300,
-                    ),
+                    Container(width: 1.5, height: 24, color: AppColors.ink300),
                     Container(
                       width: 8,
                       height: 8,
@@ -324,7 +317,9 @@ class _TripCard extends StatelessWidget {
           Row(
             children: [
               Text(
-                isCompleted ? 'Đã hoàn thành' : (isCancelled ? 'Đã huỷ' : 'Đang xử lý'),
+                isCompleted
+                    ? 'Đã hoàn thành'
+                    : (isCancelled ? 'Đã huỷ' : 'Đang xử lý'),
                 style: AppTypography.caption.copyWith(color: AppColors.ink500),
               ),
               const Spacer(),

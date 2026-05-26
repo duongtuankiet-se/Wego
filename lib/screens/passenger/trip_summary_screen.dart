@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -195,7 +196,7 @@ class _TripSummaryScreenState extends ConsumerState<TripSummaryScreen>
                   children: [
                     WgPaymentChip(
                       label: PaymentMethod.cash.label,
-                      icon: Icons.payments_outlined,
+                      icon: PhosphorIconsRegular.money,
                       selected: pm == PaymentMethod.cash,
                       onTap: () => ref
                           .read(selectedPaymentMethodProvider.notifier)
@@ -204,7 +205,7 @@ class _TripSummaryScreenState extends ConsumerState<TripSummaryScreen>
                     const SizedBox(width: 10),
                     WgPaymentChip(
                       label: PaymentMethod.card.label,
-                      icon: Icons.credit_card_outlined,
+                      icon: PhosphorIconsRegular.creditCard,
                       selected: pm == PaymentMethod.card,
                       onTap: () => ref
                           .read(selectedPaymentMethodProvider.notifier)
@@ -312,7 +313,7 @@ class _Header extends StatelessWidget {
                 shape: BoxShape.circle,
               ),
               child: const Icon(
-                Icons.check_rounded,
+                PhosphorIconsBold.check,
                 color: AppColors.success,
                 size: 48,
               ),
@@ -402,7 +403,7 @@ class _StickyCta extends StatelessWidget {
         size: WgButtonSize.lg,
         isFullWidth: true,
         isLoading: loading,
-        trailingIcon: Icons.arrow_forward_rounded,
+        trailingIcon: PhosphorIconsRegular.arrowRight,
         onPressed: loading ? null : onPressed,
       ),
     );

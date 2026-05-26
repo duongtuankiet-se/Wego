@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -47,7 +48,7 @@ class WgIncentiveCard extends StatelessWidget {
                   borderRadius: BorderRadius.circular(12),
                 ),
                 child: const Icon(
-                  Icons.local_fire_department,
+                  PhosphorIconsFill.fire,
                   color: _gold,
                   size: 22,
                 ),

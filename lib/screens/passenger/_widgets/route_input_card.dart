@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -77,7 +78,7 @@ class RouteInputCard extends StatelessWidget {
                           ),
                         ),
                         const Icon(
-                          Icons.edit_outlined,
+                          PhosphorIconsRegular.pencilSimple,
                           color: AppColors.ink500,
                           size: 16,
                         ),

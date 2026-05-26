@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -32,7 +33,7 @@ class PassengerPromoScreen extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(
-                  Icons.local_offer_outlined,
+                  PhosphorIconsRegular.tag,
                   color: AppColors.primary500,
                   size: 22,
                 ),
@@ -161,7 +162,7 @@ class _PromoCard extends StatelessWidget {
                     if (!context.mounted) return;
                     WgToast.success(context, 'Đã sao chép mã ${promo.code}');
                   },
-                  icon: const Icon(Icons.copy_outlined, size: 16),
+                  icon: const Icon(PhosphorIconsRegular.copy, size: 16),
                   label: const Text('Sao chép'),
                   style: TextButton.styleFrom(
                     foregroundColor: AppColors.primary500,

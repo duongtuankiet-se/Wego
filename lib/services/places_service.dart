@@ -114,7 +114,8 @@ class PlacesService {
       final loc = geo['location'] as Map<String, dynamic>;
       return PlaceDetails(
         placeId: result['place_id'] as String,
-        name: (result['name'] as String?) ??
+        name:
+            (result['name'] as String?) ??
             (result['formatted_address'] as String? ?? ''),
         address: (result['formatted_address'] as String?) ?? '',
         lat: (loc['lat'] as num).toDouble(),

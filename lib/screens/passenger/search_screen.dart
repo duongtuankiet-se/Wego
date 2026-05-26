@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -102,7 +103,7 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
         elevation: 0,
         scrolledUnderElevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Đi đâu?'),
@@ -127,7 +128,7 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
                 children: [
                   WgChip(
                     label: 'Chọn trên bản đồ',
-                    leadingIcon: Icons.map_outlined,
+                    leadingIcon: PhosphorIconsRegular.mapTrifold,
                     onTap: () => WgToast.info(context, 'Đang phát triển'),
                   ),
                   const SizedBox(width: 12),
@@ -135,7 +136,7 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
                     opacity: 0.5,
                     child: WgChip(
                       label: 'Thêm điểm dừng',
-                      leadingIcon: Icons.add_location_alt_outlined,
+                      leadingIcon: PhosphorIconsRegular.mapPinPlus,
                       onTap: null,
                     ),
                   ),
@@ -233,14 +234,14 @@ class _EmptyState extends StatelessWidget {
           ),
         ),
         _SavedRow(
-          icon: Icons.home_outlined,
+          icon: PhosphorIconsRegular.house,
           title: 'Nhà',
           subtitle: 'Chưa cài đặt',
           actionLabel: 'Thêm',
           onAction: () => _hint(context),
         ),
         _SavedRow(
-          icon: Icons.business_outlined,
+          icon: PhosphorIconsRegular.briefcase,
           title: 'Công ty',
           subtitle: 'Chưa cài đặt',
           actionLabel: 'Thêm',
@@ -437,10 +438,7 @@ class _CombinedResults extends StatelessWidget {
           (s) => InkWell(
             onTap: () => onApiSelect(s),
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20,
-                vertical: 12,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               child: Row(
                 children: [
                   Container(
@@ -451,7 +449,7 @@ class _CombinedResults extends StatelessWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(
-                      Icons.location_on_outlined,
+                      PhosphorIconsRegular.mapPin,
                       color: AppColors.primary500,
                       size: 22,
                     ),
@@ -504,7 +502,11 @@ class _NoResults extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.search_off, color: AppColors.ink300, size: 64),
+            const Icon(
+              PhosphorIconsRegular.magnifyingGlassMinus,
+              color: AppColors.ink300,
+              size: 64,
+            ),
             const SizedBox(height: 16),
             Text(
               'Không tìm thấy "${query.trim()}"',

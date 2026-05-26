@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -11,7 +12,7 @@ class WgErrorState extends StatelessWidget {
     this.message,
     this.onRetry,
     this.retryLabel = 'Thử lại',
-    this.icon = Icons.error_outline_rounded,
+    this.icon = PhosphorIconsRegular.warningCircle,
   });
 
   final String title;
@@ -50,7 +51,7 @@ class WgErrorState extends StatelessWidget {
               const SizedBox(height: 20),
               WgButton.secondary(
                 label: retryLabel,
-                leadingIcon: Icons.refresh,
+                leadingIcon: PhosphorIconsRegular.arrowsClockwise,
                 onPressed: onRetry,
               ),
             ],

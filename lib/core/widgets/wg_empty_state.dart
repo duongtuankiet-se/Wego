@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -9,7 +10,7 @@ class WgEmptyState extends StatelessWidget {
     super.key,
     required this.title,
     this.subtitle,
-    this.icon = Icons.inbox_outlined,
+    this.icon = PhosphorIconsRegular.tray,
     this.ctaLabel,
     this.onCta,
   });

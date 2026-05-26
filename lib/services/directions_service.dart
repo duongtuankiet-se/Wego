@@ -66,9 +66,7 @@ class DirectionsService {
     );
 
     try {
-      final res = await http
-          .get(uri)
-          .timeout(const Duration(seconds: 8));
+      final res = await http.get(uri).timeout(const Duration(seconds: 8));
       if (res.statusCode != 200) {
         developer.log(
           'HTTP ${res.statusCode}: ${res.body}',

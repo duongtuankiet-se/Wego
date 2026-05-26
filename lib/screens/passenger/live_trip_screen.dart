@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -73,10 +74,14 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     final lats = [pickup.latitude, dropoff.latitude, car.latitude];
     final lngs = [pickup.longitude, dropoff.longitude, car.longitude];
     final bounds = LatLngBounds(
-      southwest: LatLng(lats.reduce((a, b) => a < b ? a : b),
-          lngs.reduce((a, b) => a < b ? a : b)),
-      northeast: LatLng(lats.reduce((a, b) => a > b ? a : b),
-          lngs.reduce((a, b) => a > b ? a : b)),
+      southwest: LatLng(
+        lats.reduce((a, b) => a < b ? a : b),
+        lngs.reduce((a, b) => a < b ? a : b),
+      ),
+      northeast: LatLng(
+        lats.reduce((a, b) => a > b ? a : b),
+        lngs.reduce((a, b) => a > b ? a : b),
+      ),
     );
     Future.delayed(const Duration(milliseconds: 350), () {
       _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
@@ -217,7 +222,7 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 const Icon(
-                  Icons.info_outline,
+                  PhosphorIconsRegular.info,
                   color: AppColors.warning,
                   size: 48,
                 ),
@@ -350,9 +355,7 @@ class _MapBody extends StatelessWidget {
         Marker(
           markerId: const MarkerId('dropoff'),
           position: dropoff,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueRed,
-          ),
+          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
         ),
         Marker(
           markerId: const MarkerId('driver'),
@@ -387,7 +390,11 @@ class _SosButton extends StatelessWidget {
             child: const SizedBox(
               width: 44,
               height: 44,
-              child: Icon(Icons.shield, color: Colors.white, size: 22),
+              child: Icon(
+                PhosphorIconsFill.shield,
+                color: Colors.white,
+                size: 22,
+              ),
             ),
           ),
         ),
@@ -450,18 +457,18 @@ class _PanelContent extends StatelessWidget {
             children: [
               WgChip(
                 label: 'Chia sẻ chuyến',
-                leadingIcon: Icons.share_outlined,
+                leadingIcon: PhosphorIconsRegular.shareNetwork,
                 onTap: () =>
                     WgToast.info(context, 'Đã copy link chia sẻ (mock)'),
               ),
               WgChip(
                 label: 'An toàn',
-                leadingIcon: Icons.shield_outlined,
+                leadingIcon: PhosphorIconsRegular.shield,
                 onTap: () => WgToast.info(context, 'Số khẩn cấp: 112'),
               ),
               WgChip(
                 label: 'Hủy chuyến',
-                leadingIcon: Icons.close,
+                leadingIcon: PhosphorIconsRegular.x,
                 onTap: onCancel,
               ),
             ],

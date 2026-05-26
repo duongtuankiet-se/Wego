@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_radius.dart';
@@ -107,7 +108,7 @@ class WgListTile extends StatelessWidget {
                   (onTap == null
                       ? const SizedBox.shrink()
                       : Icon(
-                          Icons.chevron_right_rounded,
+                          PhosphorIconsRegular.caretRight,
                           color: AppColors.ink400,
                           size: 22,
                         )),

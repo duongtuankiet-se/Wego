@@ -6,11 +6,14 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/wg_avatar.dart';
+import '../../core/widgets/wg_glass.dart';
 import '../../core/widgets/wg_incentive_card.dart';
 import '../../core/widgets/wg_status_toggle.dart';
 import '../../core/widgets/wg_toast.dart';
@@ -140,6 +143,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     const panelMin = 96.0;
     final panelMax = mq.size.height * 0.85;
 
+    final isOnline = statusAsync.valueOrNull == DriverStatus.online;
+
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: Stack(
@@ -162,12 +167,12 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 offset: Offset(0, -4),
               ),
             ],
-            panelBuilder: (sc) =>
-                _Panel(scrollController: sc, statsAsync: statsAsync),
-            body: _MapBody(
-              onMapCreated: (c) => _map = c,
-              driverPos: loc,
+            panelBuilder: (sc) => _Panel(
+              scrollController: sc,
+              statsAsync: statsAsync,
+              isOnline: isOnline,
             ),
+            body: _MapBody(onMapCreated: (c) => _map = c, driverPos: loc),
           ),
           Positioned(
             top: mq.padding.top + 12,
@@ -255,19 +260,10 @@ class _TopHeader extends StatelessWidget {
     return Row(
       children: [
         Flexible(
-          child: Container(
-            padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
-            decoration: BoxDecoration(
-              color: AppColors.white.withValues(alpha: 0.96),
-              borderRadius: BorderRadius.circular(999),
-              boxShadow: [
-                BoxShadow(
-                  color: AppColors.ink900.withValues(alpha: 0.1),
-                  blurRadius: 16,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
+          child: WgGlass(
+            borderRadius: BorderRadius.circular(999),
+            opacity: 0.82,
+            padding: const EdgeInsets.fromLTRB(6, 6, 16, 6),
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
@@ -305,7 +301,7 @@ class _TopHeader extends StatelessWidget {
         ),
         const Spacer(),
         _GlassIcon(
-          icon: Icons.notifications_outlined,
+          icon: PhosphorIconsRegular.bell,
           hasDot: true,
           onTap: () => WgToast.info(context, 'Chưa có thông báo mới'),
         ),
@@ -326,50 +322,39 @@ class _GlassIcon extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: AppColors.ink300.withValues(alpha: 0.5),
-              width: 0.5,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.ink900.withValues(alpha: 0.1),
-                blurRadius: 14,
-                offset: const Offset(0, 4),
-              ),
-            ],
-          ),
-          child: Stack(
-            children: [
-              Center(child: Icon(icon, color: AppColors.ink700, size: 22)),
-              if (hasDot)
-                Positioned(
-                  top: 11,
-                  right: 12,
-                  child: Container(
-                    width: 8,
-                    height: 8,
-                    decoration: BoxDecoration(
-                      color: AppColors.danger,
-                      shape: BoxShape.circle,
-                      border: Border.all(color: AppColors.white, width: 1),
+    return WgGlass(
+      borderRadius: BorderRadius.circular(22),
+      opacity: 0.82,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            HapticFeedback.lightImpact();
+            onTap();
+          },
+          borderRadius: BorderRadius.circular(22),
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Stack(
+              children: [
+                Center(child: Icon(icon, color: AppColors.ink700, size: 22)),
+                if (hasDot)
+                  Positioned(
+                    top: 11,
+                    right: 12,
+                    child: Container(
+                      width: 8,
+                      height: 8,
+                      decoration: BoxDecoration(
+                        color: AppColors.danger,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.white, width: 1),
+                      ),
                     ),
                   ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
@@ -382,29 +367,25 @@ class _RecenterFab extends StatelessWidget {
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.ink900.withValues(alpha: 0.14),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        boxShadow: AppShadows.md,
+      ),
+      child: ClipOval(
+        child: Material(
+          color: AppColors.white,
+          child: InkWell(
+            onTap: onTap,
+            child: const SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(
+                PhosphorIconsFill.crosshair,
+                color: AppColors.primary500,
+                size: 22,
               ),
-            ],
-          ),
-          child: const Icon(
-            Icons.my_location,
-            color: AppColors.primary500,
-            size: 20,
+            ),
           ),
         ),
       ),
@@ -413,9 +394,14 @@ class _RecenterFab extends StatelessWidget {
 }
 
 class _Panel extends ConsumerWidget {
-  const _Panel({required this.scrollController, required this.statsAsync});
+  const _Panel({
+    required this.scrollController,
+    required this.statsAsync,
+    required this.isOnline,
+  });
   final ScrollController scrollController;
   final AsyncValue statsAsync;
+  final bool isOnline;
 
   String _short(int vnd) {
     if (vnd == 0) return '0đ';
@@ -452,8 +438,15 @@ class _Panel extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 16),
-        // Stats strip inside the panel header so it never overlaps the
-        // map FAB or the hotspot cards below.
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: _StatusHeroCard(
+            isOnline: isOnline,
+            earningsLabel: _short(stats?.earningsVnd ?? 0),
+            tripCount: stats?.tripCount ?? 0,
+          ),
+        ),
+        const SizedBox(height: 14),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
           child: GestureDetector(
@@ -519,7 +512,7 @@ class _BottomActionsRow extends StatelessWidget {
         children: [
           Expanded(
             child: _ActionButton(
-              icon: Icons.account_balance_wallet_outlined,
+              icon: PhosphorIconsRegular.wallet,
               label: 'Ví',
               onTap: () => context.push('/driver/wallet'),
             ),
@@ -527,12 +520,196 @@ class _BottomActionsRow extends StatelessWidget {
           const SizedBox(width: 10),
           Expanded(
             child: _ActionButton(
-              icon: Icons.trending_up,
+              icon: PhosphorIconsRegular.trendUp,
               label: 'Hiệu suất',
               onTap: () => context.push('/driver/performance'),
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _StatusHeroCard extends StatelessWidget {
+  const _StatusHeroCard({
+    required this.isOnline,
+    required this.earningsLabel,
+    required this.tripCount,
+  });
+
+  final bool isOnline;
+  final String earningsLabel;
+  final int tripCount;
+
+  @override
+  Widget build(BuildContext context) {
+    final gradient = isOnline
+        ? const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.primary500, AppColors.primary700],
+          )
+        : const LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: [AppColors.ink700, AppColors.ink900],
+          );
+    final glowColor = isOnline ? AppColors.primary500 : AppColors.ink900;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
+      decoration: BoxDecoration(
+        gradient: gradient,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            color: glowColor.withValues(alpha: 0.25),
+            blurRadius: 28,
+            offset: const Offset(0, 10),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              _PulseDot(active: isOnline),
+              const SizedBox(width: 8),
+              Text(
+                isOnline ? 'Đang sẵn sàng nhận chuyến' : 'Bạn đang tạm nghỉ',
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.white.withValues(alpha: 0.86),
+                  fontWeight: FontWeight.w600,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      earningsLabel,
+                      style: AppTypography.h1.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w800,
+                        height: 1.1,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Thu nhập hôm nay · $tripCount chuyến',
+                      style: AppTypography.micro.copyWith(
+                        color: AppColors.white.withValues(alpha: 0.75),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                  border: Border.all(
+                    color: AppColors.white.withValues(alpha: 0.25),
+                    width: 0.5,
+                  ),
+                ),
+                child: const Icon(
+                  PhosphorIconsFill.lightning,
+                  color: AppColors.white,
+                  size: 22,
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PulseDot extends StatefulWidget {
+  const _PulseDot({required this.active});
+  final bool active;
+  @override
+  State<_PulseDot> createState() => _PulseDotState();
+}
+
+class _PulseDotState extends State<_PulseDot>
+    with SingleTickerProviderStateMixin {
+  late final AnimationController _c;
+
+  @override
+  void initState() {
+    super.initState();
+    _c = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    if (widget.active) _c.repeat();
+  }
+
+  @override
+  void didUpdateWidget(covariant _PulseDot old) {
+    super.didUpdateWidget(old);
+    if (widget.active && !_c.isAnimating) {
+      _c.repeat();
+    } else if (!widget.active && _c.isAnimating) {
+      _c.stop();
+      _c.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _c.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: 12,
+      height: 12,
+      child: AnimatedBuilder(
+        animation: _c,
+        builder: (_, _) {
+          final t = _c.value;
+          return Stack(
+            alignment: Alignment.center,
+            children: [
+              if (widget.active)
+                Container(
+                  width: 12 + 12 * t,
+                  height: 12 + 12 * t,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    color: AppColors.white.withValues(alpha: 0.45 * (1 - t)),
+                  ),
+                ),
+              Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: widget.active
+                      ? AppColors.white
+                      : AppColors.white.withValues(alpha: 0.5),
+                ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

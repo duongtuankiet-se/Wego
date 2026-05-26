@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -19,25 +20,25 @@ class PlaceListItem extends StatelessWidget {
   IconData _iconFor(String? key) {
     switch (key) {
       case 'flight':
-        return Icons.flight;
+        return PhosphorIconsFill.airplane;
       case 'landscape':
-        return Icons.landscape;
+        return PhosphorIconsFill.mountains;
       case 'location_city':
-        return Icons.location_city;
+        return PhosphorIconsFill.buildings;
       case 'storefront':
-        return Icons.storefront;
+        return PhosphorIconsFill.storefront;
       case 'beach_access':
-        return Icons.beach_access;
+        return PhosphorIconsFill.umbrella;
       case 'school':
-        return Icons.school;
+        return PhosphorIconsFill.graduationCap;
       case 'store':
-        return Icons.store;
+        return PhosphorIconsFill.shoppingBag;
       case 'home':
-        return Icons.home;
+        return PhosphorIconsFill.house;
       case 'business':
-        return Icons.business;
+        return PhosphorIconsFill.briefcase;
       default:
-        return Icons.location_on;
+        return PhosphorIconsFill.mapPin;
     }
   }
 
