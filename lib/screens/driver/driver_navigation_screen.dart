@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
+import '../../core/utils/geofence_util.dart';
 import '../../core/utils/geohash_util.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_button.dart';
@@ -18,7 +19,9 @@ import '../../data/turn_instructions.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/driver_provider.dart';
 import '../../providers/driver_service_provider.dart';
+import '../../providers/trip_service_provider.dart';
 import '../../services/directions_service.dart';
+import '../../models/trip.dart';
 import '_widgets/navigation_instruction_card.dart';
 
 class DriverNavigationScreen extends ConsumerStatefulWidget {
@@ -51,6 +54,10 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   /// polyline points and turn-by-turn steps.
   DirectionsRoute? _route;
   int _currentStepIndex = 0;
+
+  /// Set once per phase the moment the car enters the 50m geofence so
+  /// repeat triggers don't fire while idling at the curb.
+  bool _arrivalFired = false;
 
   List<LatLng>? get _routePoints => _route?.points;
 
@@ -132,6 +139,35 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
 
     setState(() => _carPos = newPos);
     _advanceStepIfClose(newPos);
+    _checkGeofence(newPos);
+  }
+
+  /// Phase auto-advance when the car physically arrives. Fires once per
+  /// leg (guarded by `_arrivalFired`) so the driver isn't spammed if
+  /// they idle at the pickup.
+  void _checkGeofence(LatLng carPos) {
+    if (_arrivalFired) return;
+    final trip = ref.read(currentTripProvider);
+    if (trip == null) return;
+
+    switch (_phase) {
+      case _Phase.toPickup:
+        final pickup = LatLng(trip.trip.pickupLat, trip.trip.pickupLng);
+        if (GeofenceUtil.isWithin(carPos, pickup)) {
+          _arrivalFired = true;
+          _phaseTimer?.cancel();
+          _onArrived();
+        }
+      case _Phase.toDropoff:
+        final dropoff = LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
+        if (GeofenceUtil.isWithin(carPos, dropoff)) {
+          _arrivalFired = true;
+          _phaseTimer?.cancel();
+          _onCompleted();
+        }
+      case _Phase.arrived:
+        break;
+    }
   }
 
   /// Advance to the next maneuver when the car gets within 50m of the
@@ -157,11 +193,18 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     }
   }
 
-  void _onArrived() {
+  Future<void> _onArrived() async {
     if (!mounted) return;
-    HapticFeedback.mediumImpact();
+    HapticFeedback.heavyImpact();
     setState(() => _phase = _Phase.arrived);
-    WgToast.info(context, 'Bạn đã đến điểm đón');
+    WgToast.success(context, 'Đã đến điểm đón khách');
+    try {
+      // Reflect in Mongo so the passenger's Live Trip flips to
+      // "driverArrived" too.
+      await ref
+          .read(tripServiceProvider)
+          .updateStatus(widget.tripId, TripStatus.accepted);
+    } catch (_) {}
   }
 
   Future<void> _markPickedUp() async {
@@ -181,6 +224,7 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
       _carPos = _legStart;
       _route = null;
       _currentStepIndex = 0;
+      _arrivalFired = false;
     });
     _refreshRoute();
     _fitBounds(_legStart, _legEnd);

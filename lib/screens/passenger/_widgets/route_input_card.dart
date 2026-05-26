@@ -145,6 +145,14 @@ class _DropoffField extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         textInputAction: TextInputAction.search,
+        // VN IME hardening: autocorrect interferes with Telex/VNI
+        // composing regions (Samsung/Xiaomi keyboards drop characters
+        // when autocorrect tries to "fix" a diacritic mid-compose).
+        // Keep suggestions on so the user still sees their recent typed
+        // words, but no auto-replace.
+        autocorrect: false,
+        enableSuggestions: true,
+        keyboardType: TextInputType.text,
         cursorColor: AppColors.primary500,
         style: AppTypography.body.copyWith(
           fontWeight: FontWeight.w600,

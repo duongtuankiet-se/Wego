@@ -4,7 +4,6 @@ import 'package:flutter/services.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/format.dart';
-import '../../../core/widgets/wg_badge.dart';
 
 class RideTypeCard extends StatelessWidget {
   const RideTypeCard({
@@ -53,81 +52,109 @@ class RideTypeCard extends StatelessWidget {
                 width: selected ? 2 : 1,
               ),
             ),
-            child: Stack(
-              clipBehavior: Clip.none,
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
-                Row(
-                  crossAxisAlignment: CrossAxisAlignment.center,
-                  children: [
-                    Container(
-                      width: 56,
-                      height: 56,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary100,
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Icon(icon, color: AppColors.primary500, size: 28),
-                    ),
-                    const SizedBox(width: 14),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary100,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(icon, color: AppColors.primary500, size: 28),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      // Title row keeps the saving badge inline so it
+                      // never overlaps the price column on the right.
+                      Row(
                         children: [
-                          Text(
-                            title,
-                            style: AppTypography.bodyLarge.copyWith(
-                              color: AppColors.ink900,
-                              fontWeight: FontWeight.w700,
+                          Flexible(
+                            child: Text(
+                              title,
+                              style: AppTypography.bodyLarge.copyWith(
+                                color: AppColors.ink900,
+                                fontWeight: FontWeight.w700,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
-                          const SizedBox(height: 2),
-                          Text(
-                            etaLabel,
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.ink500,
-                            ),
-                          ),
+                          if (savingBadge != null) ...[
+                            const SizedBox(width: 6),
+                            _SavingBadge(label: savingBadge!),
+                          ],
                         ],
                       ),
-                    ),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        if (strikethroughPrice != null)
-                          Text(
-                            formatVnd(strikethroughPrice!),
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.ink500,
-                              decoration: TextDecoration.lineThrough,
-                              fontFeatures: const [
-                                FontFeature.tabularFigures(),
-                              ],
-                            ),
-                          ),
-                        Text(
-                          formatVnd(price),
-                          style: AppTypography.bodyLarge.copyWith(
-                            color: AppColors.primary500,
-                            fontWeight: FontWeight.w700,
-                            fontFeatures: const [FontFeature.tabularFigures()],
-                          ),
+                      const SizedBox(height: 2),
+                      Text(
+                        etaLabel,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.ink500,
                         ),
-                      ],
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    if (strikethroughPrice != null)
+                      Text(
+                        formatVnd(strikethroughPrice!),
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.ink500,
+                          decoration: TextDecoration.lineThrough,
+                          fontFeatures: const [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    Text(
+                      formatVnd(price),
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.primary500,
+                        fontWeight: FontWeight.w700,
+                        fontFeatures: const [FontFeature.tabularFigures()],
+                      ),
                     ),
                   ],
                 ),
-                if (savingBadge != null)
-                  Positioned(
-                    top: -6,
-                    right: -6,
-                    child: WgBadge(
-                      label: savingBadge!,
-                      variant: WgBadgeVariant.shared,
-                    ),
-                  ),
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SavingBadge extends StatelessWidget {
+  const _SavingBadge({required this.label});
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      decoration: BoxDecoration(
+        color: AppColors.sharedAccent.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Text(
+        label,
+        style: AppTypography.micro.copyWith(
+          fontSize: 10,
+          fontWeight: FontWeight.w700,
+          color: AppColors.sharedAccent,
+          letterSpacing: 0.3,
         ),
       ),
     );
