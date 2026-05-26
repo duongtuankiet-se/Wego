@@ -6,6 +6,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
 
 import '../core/env.dart';
+import '../core/utils/geohash_util.dart';
 
 class DirectionsRoute {
   /// Decoded polyline points to feed into a [Polyline].
@@ -82,6 +83,23 @@ class DirectionsService {
       developer.log('Missing GOOGLE_MAPS_API_KEY', name: 'directions');
       return null;
     }
+    // Short straight-line trips reliably return ZERO_RESULTS from
+    // Directions ("the destination is on the same building"). Skip the
+    // call so the caller can fall back to its own interpolated polyline
+    // without burning quota.
+    final straightKm = GeohashUtil.distanceKm(
+      origin.latitude,
+      origin.longitude,
+      destination.latitude,
+      destination.longitude,
+    );
+    if (straightKm < 0.05) {
+      developer.log(
+        'Skipping API call: straight-line=${straightKm.toStringAsFixed(3)}km',
+        name: 'directions',
+      );
+      return null;
+    }
     final uri = Uri.parse(_endpoint).replace(
       queryParameters: <String, String>{
         'origin': '${origin.latitude},${origin.longitude}',
@@ -96,23 +114,28 @@ class DirectionsService {
     try {
       final res = await http.get(uri).timeout(const Duration(seconds: 8));
       if (res.statusCode != 200) {
-        developer.log(
-          'HTTP ${res.statusCode}: ${res.body}',
-          name: 'directions',
-        );
+        // Truncate body so a 5MB error page doesn't flood the console.
+        final preview = res.body.length > 240
+            ? '${res.body.substring(0, 240)}…'
+            : res.body;
+        developer.log('HTTP ${res.statusCode}: $preview', name: 'directions');
         return null;
       }
       final json = jsonDecode(res.body) as Map<String, dynamic>;
       final status = json['status'] as String?;
       if (status != 'OK') {
         developer.log(
-          'API status=$status: ${json['error_message']}',
+          'API status=$status error=${json['error_message']} '
+          'origin=$origin dest=$destination',
           name: 'directions',
         );
         return null;
       }
       final routes = json['routes'] as List?;
-      if (routes == null || routes.isEmpty) return null;
+      if (routes == null || routes.isEmpty) {
+        developer.log('No routes returned', name: 'directions');
+        return null;
+      }
       final route = routes.first as Map<String, dynamic>;
       final legs = route['legs'] as List;
       final leg = legs.first as Map<String, dynamic>;

@@ -8,6 +8,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/utils/geohash_util.dart';
+import '../../core/utils/polyline_fallback.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/place.dart';
@@ -44,7 +45,6 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
 
   DirectionsRoute? _route;
   bool _loadingRoute = true;
-  bool _routeFailed = false;
   LatLng? _lastFetchKey;
 
   Future<void> _maybeFetchRoute(LatLng pickup, LatLng dropoff) async {
@@ -57,10 +57,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     if (_lastFetchKey == key) return;
     _lastFetchKey = key;
 
-    setState(() {
-      _loadingRoute = true;
-      _routeFailed = false;
-    });
+    setState(() => _loadingRoute = true);
 
     final result = await DirectionsService.getRoute(
       origin: pickup,
@@ -71,7 +68,6 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     setState(() {
       _route = result;
       _loadingRoute = false;
-      _routeFailed = result == null;
     });
   }
 
@@ -165,7 +161,14 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
                 RoutePreviewMap(
                   pickup: pickup,
                   dropoff: dest,
-                  routePoints: _route?.points,
+                  routePoints:
+                      _route?.points ??
+                      (_loadingRoute
+                          ? null
+                          : PolylineFallback.interpolate(
+                              origin: pickup,
+                              destination: dest,
+                            )),
                   height: 200,
                 ),
                 if (_loadingRoute)
@@ -173,13 +176,6 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
                     top: 12,
                     right: 12,
                     child: _RouteLoadingPill(),
-                  ),
-                if (_routeFailed && !_loadingRoute)
-                  const Positioned(
-                    top: 12,
-                    left: 12,
-                    right: 12,
-                    child: _RouteFallbackBanner(),
                   ),
               ],
             ),
@@ -332,50 +328,6 @@ class _RouteLoadingPill extends StatelessWidget {
           Text(
             'Đang tìm tuyến đường…',
             style: AppTypography.caption.copyWith(color: AppColors.ink700),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _RouteFallbackBanner extends StatelessWidget {
-  const _RouteFallbackBanner();
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-      decoration: BoxDecoration(
-        color: AppColors.warning.withValues(alpha: 0.95),
-        borderRadius: BorderRadius.circular(12),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink900.withValues(alpha: 0.1),
-            blurRadius: 8,
-            offset: const Offset(0, 2),
-          ),
-        ],
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            PhosphorIconsFill.warning,
-            color: AppColors.white,
-            size: 16,
-          ),
-          const SizedBox(width: 8),
-          Flexible(
-            child: Text(
-              'Không tải được tuyến đường — đang dùng ước tính',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.white,
-                fontWeight: FontWeight.w600,
-              ),
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
           ),
         ],
       ),

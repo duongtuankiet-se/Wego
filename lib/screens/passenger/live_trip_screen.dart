@@ -5,8 +5,9 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -14,6 +15,7 @@ import '../../core/widgets/wg_chip.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/trip.dart';
 import '../../providers/current_trip_provider.dart';
+import '../../providers/mongo_provider.dart';
 import '../../providers/trip_service_provider.dart';
 import '../../services/directions_service.dart';
 import '_widgets/driver_info_card.dart';
@@ -55,6 +57,14 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   /// Fetched lazily so we can animate the car along real roads too.
   List<LatLng>? _approachPoints;
 
+  /// Realtime ETA refresh: every 5s we read the driver's latest
+  /// `current_lat`/`current_lng` from Mongo (which the driver-nav
+  /// screen pushes /3s) and re-ask Directions for the time-to-arrive
+  /// at the active phase target. `null` means we haven't gotten a
+  /// reading yet — show a spinner.
+  Timer? _etaRefreshTimer;
+  int? _realtimeEtaMinutes;
+
   @override
   void initState() {
     super.initState();
@@ -72,6 +82,52 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
 
     _phaseTimer = Timer(const Duration(seconds: 8), _phaseArrived);
     _fetchRoute(); // pre-compute pickup→dropoff polyline in background
+    _startEtaRefresh();
+  }
+
+  void _startEtaRefresh() {
+    _etaRefreshTimer?.cancel();
+    // Kick the first refresh immediately so the spinner doesn't sit on
+    // screen for 5s after entering the page.
+    _refreshEta();
+    _etaRefreshTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      _refreshEta();
+    });
+  }
+
+  /// Read latest driver coords from Mongo + ask Directions for the
+  /// remaining time to the active phase target. Skipped during the
+  /// `driverArrived` interlude — no ETA to show then.
+  Future<void> _refreshEta() async {
+    if (!mounted) return;
+    if (_phase == _LivePhase.driverArrived) return;
+    final trip = ref.read(currentTripProvider);
+    if (trip == null) return;
+
+    try {
+      final drivers = await ref.read(mongoServiceProvider).drivers();
+      final driverDoc = await drivers.findOne(
+        where.eq('_id', ObjectId.fromHexString(trip.driver.id)),
+      );
+      if (!mounted) return;
+      if (driverDoc == null) return;
+      final lat = (driverDoc['current_lat'] as num?)?.toDouble();
+      final lng = (driverDoc['current_lng'] as num?)?.toDouble();
+      if (lat == null || lng == null) return;
+
+      final target = _phase == _LivePhase.driverArriving
+          ? LatLng(trip.trip.pickupLat, trip.trip.pickupLng)
+          : LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
+
+      final route = await DirectionsService.getRoute(
+        origin: LatLng(lat, lng),
+        destination: target,
+      );
+      if (!mounted || route == null) return;
+      setState(() => _realtimeEtaMinutes = route.durationMin);
+    } catch (_) {
+      // Network blip — keep showing the previous ETA.
+    }
   }
 
   void _fitBounds(LatLng pickup, LatLng dropoff, LatLng car) {
@@ -228,6 +284,7 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   @override
   void dispose() {
     _phaseTimer?.cancel();
+    _etaRefreshTimer?.cancel();
     _carAnim
       ..removeListener(_updateCar)
       ..dispose();
@@ -247,7 +304,11 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     ),
   };
 
+  /// Prefer the realtime Directions ETA when we have one; fall back to
+  /// the animation-progress estimate so the UI never shows "—".
   int _etaMinutes() {
+    final realtime = _realtimeEtaMinutes;
+    if (realtime != null) return realtime;
     final remaining = (1 - _carAnim.value).clamp(0.0, 1.0);
     return (remaining * 8).ceil();
   }

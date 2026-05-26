@@ -1,19 +1,117 @@
 import 'dart:convert';
 import 'dart:developer' as developer;
 
+import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../core/env.dart';
+import '../core/theme/app_colors.dart';
+
+/// Đà Nẵng city center — used as the location bias for autocomplete so
+/// nearby POIs surface first. 30km radius covers everything from the
+/// airport to Hội An and Bà Nà.
+const _kDanangBiasLat = 16.0544;
+const _kDanangBiasLng = 108.2022;
+const _kDanangBiasRadiusMeters = 30000;
 
 class PlaceSuggestion {
   final String placeId;
   final String mainText;
   final String secondaryText;
+  final List<String> types;
+  final int? distanceMeters;
+
   const PlaceSuggestion({
     required this.placeId,
     required this.mainText,
     required this.secondaryText,
+    this.types = const [],
+    this.distanceMeters,
   });
+
+  /// Best-guess Phosphor icon for the place's primary category.
+  IconData get displayIcon {
+    if (types.contains('airport')) return PhosphorIconsFill.airplane;
+    if (types.contains('bus_station')) return PhosphorIconsFill.bus;
+    if (types.contains('train_station') || types.contains('subway_station')) {
+      return PhosphorIconsFill.train;
+    }
+    if (types.contains('transit_station')) return PhosphorIconsFill.bus;
+    if (types.contains('restaurant') ||
+        types.contains('food') ||
+        types.contains('meal_takeaway') ||
+        types.contains('meal_delivery')) {
+      return PhosphorIconsFill.forkKnife;
+    }
+    if (types.contains('cafe')) return PhosphorIconsFill.coffee;
+    if (types.contains('lodging') || types.contains('hotel')) {
+      return PhosphorIconsFill.bed;
+    }
+    if (types.contains('shopping_mall')) return PhosphorIconsFill.shoppingBag;
+    if (types.contains('store') ||
+        types.contains('supermarket') ||
+        types.contains('department_store')) {
+      return PhosphorIconsFill.storefront;
+    }
+    if (types.contains('hospital')) return PhosphorIconsFill.firstAidKit;
+    if (types.contains('pharmacy') || types.contains('drugstore')) {
+      return PhosphorIconsFill.pill;
+    }
+    if (types.contains('school') ||
+        types.contains('university') ||
+        types.contains('primary_school') ||
+        types.contains('secondary_school')) {
+      return PhosphorIconsFill.graduationCap;
+    }
+    if (types.contains('bank') || types.contains('atm')) {
+      return PhosphorIconsFill.bank;
+    }
+    if (types.contains('gas_station')) return PhosphorIconsFill.gasPump;
+    if (types.contains('tourist_attraction')) return PhosphorIconsFill.camera;
+    if (types.contains('park')) return PhosphorIconsFill.tree;
+    if (types.contains('gym')) return PhosphorIconsFill.barbell;
+    if (types.contains('place_of_worship')) {
+      return PhosphorIconsFill.buildings;
+    }
+    return PhosphorIconsFill.mapPin;
+  }
+
+  /// Tint colour matched to [displayIcon] — drives both the icon and
+  /// the surrounding tinted tile.
+  Color get displayIconColor {
+    if (types.contains('airport') ||
+        types.contains('bus_station') ||
+        types.contains('train_station') ||
+        types.contains('transit_station')) {
+      return AppColors.sharedAccent;
+    }
+    if (types.contains('restaurant') ||
+        types.contains('food') ||
+        types.contains('meal_takeaway') ||
+        types.contains('cafe')) {
+      return AppColors.warning;
+    }
+    if (types.contains('hospital') || types.contains('pharmacy')) {
+      return AppColors.danger;
+    }
+    if (types.contains('school') ||
+        types.contains('university') ||
+        types.contains('hotel') ||
+        types.contains('lodging')) {
+      return const Color(0xFF8B5CF6);
+    }
+    if (types.contains('shopping_mall') ||
+        types.contains('store') ||
+        types.contains('supermarket')) {
+      return AppColors.warning;
+    }
+    if (types.contains('gas_station')) return AppColors.ink700;
+    if (types.contains('tourist_attraction') || types.contains('park')) {
+      return const Color(0xFF0EA5E9);
+    }
+    return AppColors.primary500;
+  }
 }
 
 class PlaceDetails {
@@ -46,11 +144,19 @@ class PlacesService {
   static Future<List<PlaceSuggestion>> autocomplete(String input) async {
     if (input.trim().length < 2) return const [];
     if (!Env.hasGoogleMapsKey) return const [];
+    // Legacy Places Autocomplete supports a circular location bias via
+    // `location` + `radius` (returns `distance_meters` per result) and
+    // a `types[]` array on every prediction we can map to a Phosphor
+    // icon. Skipping `types=` filter on the request keeps both
+    // establishments (sân bay, nhà hàng) and addresses in the result
+    // list.
     final uri = Uri.parse(_autocompleteUrl).replace(
       queryParameters: <String, String>{
         'input': input,
         'language': 'vi',
         'components': 'country:vn',
+        'location': '$_kDanangBiasLat,$_kDanangBiasLng',
+        'radius': '$_kDanangBiasRadiusMeters',
         'key': Env.googleMapsApiKey,
       },
     );
@@ -74,6 +180,10 @@ class PlacesService {
         final m = p as Map<String, dynamic>;
         final structured =
             (m['structured_formatting'] as Map<String, dynamic>?) ?? {};
+        final types =
+            (m['types'] as List?)?.whereType<String>().toList() ??
+            const <String>[];
+        final distanceMeters = (m['distance_meters'] as num?)?.toInt();
         return PlaceSuggestion(
           placeId: m['place_id'] as String,
           mainText:
@@ -82,6 +192,8 @@ class PlacesService {
           secondaryText:
               (structured['secondary_text'] as String?) ??
               (m['description'] as String? ?? ''),
+          types: types,
+          distanceMeters: distanceMeters,
         );
       }).toList();
     } catch (e) {

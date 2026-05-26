@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
+import '../../core/utils/vietnamese_text_controller.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/default_saved_places.dart';
 import '../../models/place.dart';
@@ -30,7 +31,7 @@ class PassengerSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
-  final _dropoffCtrl = TextEditingController();
+  final _dropoffCtrl = VietnameseTextController();
   Timer? _debounce;
   List<PlaceSuggestion> _apiSuggestions = const [];
   bool _apiLoading = false;
@@ -44,15 +45,18 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
 
   void _onQueryChanged(String value) {
     _debounce?.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
+    // 600ms (vs 300ms before) gives Vietnamese IMEs enough time to
+    // finalize composing diacritics before we read the controller text.
+    _debounce = Timer(const Duration(milliseconds: 600), () async {
       if (!mounted) return;
-      ref.read(searchQueryProvider.notifier).setQuery(value);
-      if (value.trim().length < 2) {
+      final query = _dropoffCtrl.committedText.trim();
+      ref.read(searchQueryProvider.notifier).setQuery(query);
+      if (query.length < 2) {
         setState(() => _apiSuggestions = const []);
         return;
       }
       setState(() => _apiLoading = true);
-      final list = await PlacesService.autocomplete(value);
+      final list = await PlacesService.autocomplete(query);
       if (!mounted) return;
       setState(() {
         _apiSuggestions = list;
@@ -541,57 +545,86 @@ class _CombinedResults extends StatelessWidget {
             ),
           ),
         ...apiSuggestions.map(
-          (s) => InkWell(
-            onTap: () => onApiSelect(s),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              child: Row(
+          (s) => _ApiSuggestionRow(suggestion: s, onTap: () => onApiSelect(s)),
+        ),
+      ],
+    );
+  }
+}
+
+class _ApiSuggestionRow extends StatelessWidget {
+  const _ApiSuggestionRow({required this.suggestion, required this.onTap});
+
+  final PlaceSuggestion suggestion;
+  final VoidCallback onTap;
+
+  String _formatDistance(int meters) {
+    if (meters < 1000) return '$meters m';
+    return '${(meters / 1000).toStringAsFixed(1)} km';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final tint = suggestion.displayIconColor;
+    final distance = suggestion.distanceMeters;
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: tint.withValues(alpha: 0.12),
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: Icon(suggestion.displayIcon, color: tint, size: 22),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      color: AppColors.primary50,
-                      borderRadius: BorderRadius.circular(12),
+                  Text(
+                    suggestion.mainText,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.ink900,
+                      fontWeight: FontWeight.w600,
                     ),
-                    child: const Icon(
-                      PhosphorIconsRegular.mapPin,
-                      color: AppColors.primary500,
-                      size: 22,
-                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          s.mainText,
-                          style: AppTypography.body.copyWith(
-                            color: AppColors.ink900,
-                            fontWeight: FontWeight.w600,
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (s.secondaryText.isNotEmpty)
-                          Text(
-                            s.secondaryText,
-                            style: AppTypography.caption.copyWith(
-                              color: AppColors.ink500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
+                  if (suggestion.secondaryText.isNotEmpty) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      suggestion.secondaryText,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink500,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
-                  ),
+                  ],
                 ],
               ),
             ),
-          ),
+            if (distance != null) ...[
+              const SizedBox(width: 8),
+              Text(
+                _formatDistance(distance),
+                style: AppTypography.caption.copyWith(
+                  color: AppColors.ink500,
+                  fontWeight: FontWeight.w600,
+                  fontFamily: 'monospace',
+                ),
+              ),
+            ],
+          ],
         ),
-      ],
+      ),
     );
   }
 }
