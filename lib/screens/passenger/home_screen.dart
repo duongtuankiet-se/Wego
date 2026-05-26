@@ -1,22 +1,30 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:sliding_up_panel/sliding_up_panel.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
+import '../../core/theme/app_radius.dart';
+import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_typography.dart';
-import '../../core/utils/geohash_util.dart';
-import '../../core/widgets/wg_chip.dart';
+import '../../core/widgets/wg_avatar.dart';
+import '../../core/widgets/wg_explore_carousel.dart';
+import '../../core/widgets/wg_quick_service_tile.dart';
+import '../../core/widgets/wg_search_bar.dart';
+import '../../core/widgets/wg_service_card.dart';
 import '../../core/widgets/wg_toast.dart';
+import '../../data/mock_explore_places.dart';
 import '../../data/mock_places.dart';
+import '../../data/mock_quick_services.dart';
 import '../../models/place.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/location_provider.dart';
-import '../../providers/recent_destinations_provider.dart';
 import '../../providers/selected_destination_provider.dart';
 
+/// Hybrid landing dashboard: small Google Map banner pinned at the top,
+/// scrollable Xanh SM-style content below (search → carousel → hero
+/// banners → quick-services grid → promo).
 class PassengerHomeScreen extends ConsumerStatefulWidget {
   const PassengerHomeScreen({super.key});
 
@@ -25,202 +33,197 @@ class PassengerHomeScreen extends ConsumerStatefulWidget {
       _PassengerHomeScreenState();
 }
 
-class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen>
-    with TickerProviderStateMixin {
+class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
   GoogleMapController? _map;
-  late final AnimationController _greetingCtrl;
-
-  @override
-  void initState() {
-    super.initState();
-    _greetingCtrl = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 400),
-    );
-    Future.delayed(const Duration(milliseconds: 300), () {
-      if (mounted) _greetingCtrl.forward();
-    });
-  }
 
   @override
   void dispose() {
-    _greetingCtrl.dispose();
     _map?.dispose();
     super.dispose();
-  }
-
-  void _recenter(LatLng pos) {
-    HapticFeedback.mediumImpact();
-    _map?.animateCamera(CameraUpdate.newLatLngZoom(pos, 15));
   }
 
   void _openSearch() async {
     final picked = await context.push<Place>('/passenger/search');
     if (picked != null && mounted) {
-      // Search screen already sets selectedDestinationProvider — just navigate.
       context.push('/passenger/ride-options');
     }
   }
 
-  void _quickPickShortcut(Place place) {
-    HapticFeedback.lightImpact();
+  void _quickPickPlace(Place place) {
     ref.read(selectedDestinationProvider.notifier).set(place);
-    ref.read(recentDestinationsProvider.notifier).add(place);
     context.push('/passenger/ride-options');
+  }
+
+  void _onExploreTap(ExplorePlace ep) {
+    // Convert ExplorePlace → Place by reading the matching mock entry
+    // when ids overlap, else build a one-shot Place.
+    final match = kDanangPlaces.where(
+      (p) => p.name == ep.name,
+    );
+    final place = match.isNotEmpty
+        ? match.first
+        : Place(
+            id: ep.id,
+            name: ep.name,
+            address: ep.tagline,
+            lat: 16.0544 + (ep.distanceKm * 0.001),
+            lng: 108.2022,
+          );
+    _quickPickPlace(place);
   }
 
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authStateProvider).valueOrNull;
-    final locAsync = ref.watch(currentLocationProvider);
-    final loc = locAsync.valueOrNull ?? kDanangFallback;
-    final recentAsync = ref.watch(recentDestinationsProvider);
-    final mq = MediaQuery.of(context);
-
-    const panelMin = 96.0;
-    final panelMax = mq.size.height * 0.85;
+    final loc =
+        ref.watch(currentLocationProvider).valueOrNull ?? kDanangFallback;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
-      body: Stack(
-        children: [
-          // Sliding panel hosts the map as its body
-          SlidingUpPanel(
-            minHeight: panelMin,
-            maxHeight: panelMax,
-            defaultPanelState: PanelState.OPEN,
-            snapPoint: 0.55,
-            parallaxEnabled: true,
-            parallaxOffset: 0.4,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
-            color: AppColors.white,
-            backdropEnabled: true,
-            backdropOpacity: 0.25,
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 24,
-                color: Color(0x1F000000),
-                offset: Offset(0, -4),
+      body: DecoratedBox(
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [AppColors.primary50, AppColors.offWhite],
+            stops: [0.0, 0.45],
+          ),
+        ),
+        child: SafeArea(
+          child: CustomScrollView(
+            slivers: [
+              SliverToBoxAdapter(
+                child: _Header(user: user),
               ),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
+                  child: WgSearchBar(onTap: _openSearch),
+                ),
+              ),
+              SliverToBoxAdapter(
+                child: _MapBanner(
+                  center: loc,
+                  onMapCreated: (c) => _map = c,
+                  onTap: _openSearch,
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 20)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(child: WgServiceCard.bookRide(onTap: _openSearch)),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: WgServiceCard.bookFood(
+                          onTap: () => WgToast.info(
+                            context,
+                            'Đặt đồ ăn sẽ ra mắt sớm',
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: WgExploreCarousel(
+                    places: generateExplorePlaces(),
+                    onPlaceTap: _onExploreTap,
+                    onViewAll: _openSearch,
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 28)),
+              SliverToBoxAdapter(
+                child: _QuickServicesSection(
+                  onTileTap: (svc) => svc.comingSoon
+                      ? WgToast.info(context, '${svc.label} sẽ ra mắt sớm')
+                      : _openSearch(),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
+                  child: _PromoBanner(
+                    onTap: () => context.go('/passenger/promo'),
+                  ),
+                ),
+              ),
+              const SliverToBoxAdapter(child: SizedBox(height: 24)),
             ],
-            panelBuilder: (scrollController) => _PanelContent(
-              scrollController: scrollController,
-              userName: user?.name ?? 'bạn',
-              greetingCtrl: _greetingCtrl,
-              recentAsync: recentAsync,
-              origin: loc,
-              onSearchTap: _openSearch,
-              onShortcutTap: _quickPickShortcut,
-              onRecentTap: _quickPickShortcut,
-            ),
-            body: _MapBody(
-              onMapCreated: (c) => _map = c,
-              center: loc,
-            ),
           ),
-          // Floating top buttons (above panel + map)
-          Positioned(
-            top: mq.padding.top + 12,
-            left: 16,
-            child: _GlassButton(
-              icon: Icons.menu,
-              onTap: () => WgToast.info(context, 'Menu sẽ có ở phase sau'),
-            ),
-          ),
-          Positioned(
-            top: mq.padding.top + 12,
-            right: 16,
-            child: _GlassButton(
-              icon: Icons.notifications_outlined,
-              hasDot: true,
-              onTap: () => WgToast.info(context, 'Chưa có thông báo mới'),
-            ),
-          ),
-          // FAB recenter (sits above sliding panel peek)
-          Positioned(
-            right: 16,
-            bottom: panelMin + 20,
-            child: _RecenterFab(onTap: () => _recenter(loc)),
-          ),
-        ],
+        ),
       ),
     );
   }
 }
 
-class _MapBody extends StatelessWidget {
-  const _MapBody({required this.onMapCreated, required this.center});
-  final ValueChanged<GoogleMapController> onMapCreated;
-  final LatLng center;
+class _Header extends StatelessWidget {
+  const _Header({required this.user});
+  final dynamic user;
 
   @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: center, zoom: 15),
-      onMapCreated: onMapCreated,
-      myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
-      rotateGesturesEnabled: false,
-      tiltGesturesEnabled: false,
-      markers: <Marker>{
-        Marker(
-          markerId: const MarkerId('me'),
-          position: center,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
+    final name = user?.name as String? ?? 'bạn';
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 14),
+      child: Row(
+        children: [
+          Container(
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              border: Border.all(color: AppColors.primary300, width: 2),
+            ),
+            padding: const EdgeInsets.all(2),
+            child: WgAvatar(name: name, size: 40),
           ),
-        ),
-      },
-    );
-  }
-}
-
-class _GlassButton extends StatelessWidget {
-  const _GlassButton({
-    required this.icon,
-    required this.onTap,
-    this.hasDot = false,
-  });
-
-  final IconData icon;
-  final VoidCallback onTap;
-  final bool hasDot;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: () {
-          HapticFeedback.lightImpact();
-          onTap();
-        },
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          width: 44,
-          height: 44,
-          decoration: BoxDecoration(
-            color: AppColors.white,
-            shape: BoxShape.circle,
-            border: Border.all(color: AppColors.ink300, width: 0.5),
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.ink900.withValues(alpha: 0.08),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
-              ),
-            ],
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  'Xin chào,',
+                  style: AppTypography.caption.copyWith(
+                    color: AppColors.ink500,
+                  ),
+                ),
+                Text(
+                  name,
+                  style: AppTypography.h3,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+            ),
           ),
-          child: Stack(
-            children: [
-              Center(child: Icon(icon, color: AppColors.ink700, size: 22)),
-              if (hasDot)
+          Container(
+            width: 44,
+            height: 44,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: BorderRadius.circular(22),
+              boxShadow: AppShadows.xs,
+            ),
+            child: Stack(
+              alignment: Alignment.center,
+              children: [
+                Icon(
+                  PhosphorIconsRegular.bell,
+                  color: AppColors.ink700,
+                  size: 22,
+                ),
                 Positioned(
-                  top: 10,
-                  right: 11,
+                  top: 11,
+                  right: 12,
                   child: Container(
                     width: 8,
                     height: 8,
@@ -231,6 +234,111 @@ class _GlassButton extends StatelessWidget {
                     ),
                   ),
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _MapBanner extends StatelessWidget {
+  const _MapBanner({
+    required this.center,
+    required this.onMapCreated,
+    required this.onTap,
+  });
+  final LatLng center;
+  final ValueChanged<GoogleMapController> onMapCreated;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: ClipRRect(
+        borderRadius: AppRadius.heroCard,
+        child: Container(
+          height: 160,
+          decoration: BoxDecoration(
+            borderRadius: AppRadius.heroCard,
+            boxShadow: AppShadows.sm,
+          ),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: center,
+                    zoom: 14,
+                  ),
+                  onMapCreated: onMapCreated,
+                  myLocationButtonEnabled: false,
+                  zoomControlsEnabled: false,
+                  mapToolbarEnabled: false,
+                  compassEnabled: false,
+                  rotateGesturesEnabled: false,
+                  scrollGesturesEnabled: false,
+                  zoomGesturesEnabled: false,
+                  tiltGesturesEnabled: false,
+                  liteModeEnabled: false,
+                  markers: <Marker>{
+                    Marker(
+                      markerId: const MarkerId('me'),
+                      position: center,
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueAzure,
+                      ),
+                    ),
+                  },
+                ),
+              ),
+              // Tap overlay → go to search (since map gestures are off)
+              Positioned.fill(
+                child: Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    onTap: onTap,
+                    splashColor:
+                        AppColors.primary500.withValues(alpha: 0.08),
+                  ),
+                ),
+              ),
+              // Small pill bottom-right showing "Vị trí của bạn"
+              Positioned(
+                left: 12,
+                bottom: 12,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 12,
+                    vertical: 8,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppColors.white.withValues(alpha: 0.94),
+                    borderRadius: BorderRadius.circular(999),
+                    boxShadow: AppShadows.xs,
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        PhosphorIconsFill.mapPin,
+                        color: AppColors.primary500,
+                        size: 14,
+                      ),
+                      const SizedBox(width: 6),
+                      Text(
+                        'Vị trí của bạn',
+                        style: AppTypography.micro.copyWith(
+                          color: AppColors.ink900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ],
           ),
         ),
@@ -239,8 +347,53 @@ class _GlassButton extends StatelessWidget {
   }
 }
 
-class _RecenterFab extends StatelessWidget {
-  const _RecenterFab({required this.onTap});
+class _QuickServicesSection extends StatelessWidget {
+  const _QuickServicesSection({required this.onTileTap});
+  final ValueChanged<QuickService> onTileTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Dịch vụ khác', style: AppTypography.h3),
+          const SizedBox(height: 14),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 14),
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              borderRadius: AppRadius.card,
+              boxShadow: AppShadows.xs,
+            ),
+            child: GridView.count(
+              crossAxisCount: 4,
+              mainAxisSpacing: 4,
+              crossAxisSpacing: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              childAspectRatio: 0.82,
+              children: kQuickServices
+                  .map(
+                    (s) => WgQuickServiceTile(
+                      icon: s.icon,
+                      label: s.label,
+                      color: s.color,
+                      onTap: () => onTileTap(s),
+                    ),
+                  )
+                  .toList(),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _PromoBanner extends StatelessWidget {
+  const _PromoBanner({required this.onTap});
   final VoidCallback onTap;
 
   @override
@@ -249,317 +402,65 @@ class _RecenterFab extends StatelessWidget {
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
+        borderRadius: AppRadius.heroCard,
         child: Container(
-          width: 44,
-          height: 44,
+          padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: AppColors.white,
-            shape: BoxShape.circle,
-            boxShadow: [
-              BoxShadow(
-                color: AppColors.ink900.withValues(alpha: 0.12),
-                blurRadius: 16,
-                offset: const Offset(0, 4),
+            gradient: const LinearGradient(
+              colors: [Color(0xFFFEF3C7), Color(0xFFFEFBEA)],
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: AppRadius.heroCard,
+            boxShadow: AppShadows.xs,
+          ),
+          child: Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.warning.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(
+                  PhosphorIconsFill.gift,
+                  color: AppColors.warning,
+                  size: 26,
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Ưu đãi tuần này',
+                      style: AppTypography.bodyLarge.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: const Color(0xFF8B6F47),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      'Giảm 30% chuyến cuối tuần — xem ngay',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink700,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                PhosphorIconsRegular.caretRight,
+                color: AppColors.ink400,
+                size: 18,
               ),
             ],
           ),
-          child: const Icon(
-            Icons.my_location,
-            color: AppColors.primary500,
-            size: 20,
-          ),
         ),
       ),
     );
   }
-}
-
-class _PanelContent extends StatelessWidget {
-  const _PanelContent({
-    required this.scrollController,
-    required this.userName,
-    required this.greetingCtrl,
-    required this.recentAsync,
-    required this.origin,
-    required this.onSearchTap,
-    required this.onShortcutTap,
-    required this.onRecentTap,
-  });
-
-  final ScrollController scrollController;
-  final String userName;
-  final AnimationController greetingCtrl;
-  final AsyncValue<List<Place>> recentAsync;
-  final LatLng origin;
-  final VoidCallback onSearchTap;
-  final ValueChanged<Place> onShortcutTap;
-  final ValueChanged<Place> onRecentTap;
-
-  static const _shortcuts = [
-    (Icons.home_outlined, 'Nhà', 'p7'),
-    (Icons.business_outlined, 'Công ty', 'p4'),
-    (Icons.flight, 'Sân bay', 'p1'),
-    (Icons.beach_access, 'Biển Mỹ Khê', 'p6'),
-  ];
-
-  @override
-  Widget build(BuildContext context) {
-    final recent = recentAsync.valueOrNull ?? const <Place>[];
-    return ListView(
-      controller: scrollController,
-      padding: EdgeInsets.zero,
-      children: [
-        const SizedBox(height: 10),
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.ink300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 0),
-          child: _FadeSlide(
-            controller: greetingCtrl,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Xin chào, $userName 👋',
-                  style: AppTypography.h1,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  'Bạn muốn đi đâu hôm nay?',
-                  style: AppTypography.body.copyWith(color: AppColors.ink500),
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: GestureDetector(
-            onTap: onSearchTap,
-            child: Container(
-              height: 56,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              decoration: BoxDecoration(
-                color: AppColors.ink100,
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.search, color: AppColors.ink500, size: 22),
-                  const SizedBox(width: 12),
-                  Text(
-                    'Tìm điểm đến',
-                    style: AppTypography.body.copyWith(color: AppColors.ink500),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-        SizedBox(
-          height: 40,
-          child: ListView.separated(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 20),
-            itemCount: _shortcuts.length,
-            separatorBuilder: (_, _) => const SizedBox(width: 8),
-            itemBuilder: (context, i) {
-              final (icon, label, placeId) = _shortcuts[i];
-              return _StaggerFadeIn(
-                delay: Duration(milliseconds: 400 + i * 60),
-                child: WgChip(
-                  label: label,
-                  leadingIcon: icon,
-                  onTap: () {
-                    final place = _findPlaceById(placeId);
-                    if (place != null) onShortcutTap(place);
-                  },
-                ),
-              );
-            },
-          ),
-        ),
-        const SizedBox(height: 20),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 0, 20, 8),
-          child: Text(
-            'Đã đi gần đây',
-            style: AppTypography.bodyLarge.copyWith(color: AppColors.ink900),
-          ),
-        ),
-        if (recent.isEmpty)
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-            child: Text(
-              'Chưa có chuyến đi. Thử tìm điểm đến phía trên!',
-              style: AppTypography.body.copyWith(color: AppColors.ink500),
-            ),
-          )
-        else
-          ...List.generate(recent.length.clamp(0, 3), (i) {
-            final p = recent[i];
-            final dist = GeohashUtil.distanceKm(
-              origin.latitude,
-              origin.longitude,
-              p.lat,
-              p.lng,
-            );
-            return _StaggerFadeIn(
-              delay: Duration(milliseconds: 600 + i * 100),
-              child: _RecentRow(
-                place: p,
-                distanceKm: dist,
-                onTap: () => onRecentTap(p),
-              ),
-            );
-          }),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-}
-
-class _RecentRow extends StatelessWidget {
-  const _RecentRow({
-    required this.place,
-    required this.distanceKm,
-    required this.onTap,
-  });
-  final Place place;
-  final double distanceKm;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-        child: Row(
-          children: [
-            const Icon(Icons.location_on, color: AppColors.ink500, size: 22),
-            const SizedBox(width: 12),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    place.name,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.ink900,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  Text(
-                    place.address,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.ink500,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(width: 8),
-            Text(
-              '${distanceKm.toStringAsFixed(1)} km',
-              style: AppTypography.caption.copyWith(
-                color: AppColors.ink500,
-                fontFeatures: const [FontFeature.tabularFigures()],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class _FadeSlide extends StatelessWidget {
-  const _FadeSlide({required this.controller, required this.child});
-  final AnimationController controller;
-  final Widget child;
-  @override
-  Widget build(BuildContext context) {
-    return AnimatedBuilder(
-      animation: controller,
-      builder: (context, _) {
-        return Opacity(
-          opacity: controller.value,
-          child: Transform.translate(
-            offset: Offset(0, (1 - controller.value) * 10),
-            child: child,
-          ),
-        );
-      },
-    );
-  }
-}
-
-class _StaggerFadeIn extends StatefulWidget {
-  const _StaggerFadeIn({required this.delay, required this.child});
-  final Duration delay;
-  final Widget child;
-  @override
-  State<_StaggerFadeIn> createState() => _StaggerFadeInState();
-}
-
-class _StaggerFadeInState extends State<_StaggerFadeIn>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _controller;
-  @override
-  void initState() {
-    super.initState();
-    _controller = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 260),
-    );
-    Future.delayed(widget.delay, () {
-      if (mounted) _controller.forward();
-    });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return FadeTransition(
-      opacity: _controller,
-      child: SlideTransition(
-        position: Tween<Offset>(begin: const Offset(0, 0.15), end: Offset.zero)
-            .animate(
-              CurvedAnimation(parent: _controller, curve: Curves.easeOutCubic),
-            ),
-        child: widget.child,
-      ),
-    );
-  }
-}
-
-Place? _findPlaceById(String id) {
-  for (final p in kDanangPlaces) {
-    if (p.id == id) return p;
-  }
-  return null;
 }
