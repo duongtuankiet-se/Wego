@@ -14,6 +14,7 @@ class User with _$User {
     required String phone,
     required UserRole role,
     String? avatar,
+    String? firebaseUid,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _User;
@@ -26,6 +27,7 @@ class User with _$User {
     phone: doc['phone'] as String,
     role: UserRole.values.byName(doc['role'] as String),
     avatar: doc['avatar'] as String?,
+    firebaseUid: doc['firebase_uid'] as String?,
     createdAt: doc['created_at'] as DateTime,
     updatedAt: doc['updated_at'] as DateTime,
   );

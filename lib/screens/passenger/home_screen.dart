@@ -15,7 +15,6 @@ import '../../core/widgets/wg_search_bar.dart';
 import '../../core/widgets/wg_service_card.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_explore_places.dart';
-import '../../data/mock_places.dart';
 import '../../data/mock_quick_services.dart';
 import '../../models/place.dart';
 import '../../models/trip.dart';
@@ -45,16 +44,62 @@ class PassengerHomeScreen extends ConsumerWidget {
     context.push('/passenger/ride-options');
   }
 
+  /// Preset destination used by the "Sân bay" quick tile. Coords match
+  /// the Phase 5C saved-place entry so recents + matching stay aligned.
+  static const Place _airportPreset = Place(
+    id: 'preset_dad_airport',
+    name: 'Sân bay Quốc tế Đà Nẵng',
+    address: 'Hải Châu, Đà Nẵng',
+    lat: 16.0439,
+    lng: 108.1995,
+    icon: 'airplane',
+  );
+
+  Future<void> _handleQuickService(
+    BuildContext context,
+    WidgetRef ref,
+    QuickService svc,
+  ) async {
+    switch (svc.action) {
+      case QuickServiceAction.openSearch:
+        await _openSearch(context);
+      case QuickServiceAction.presetDropoff:
+        _quickPickPlace(context, ref, _airportPreset);
+      case QuickServiceAction.comingSoon:
+        WgToast.info(context, '${svc.label} sẽ ra mắt sớm');
+      case QuickServiceAction.pickCustomPickup:
+        final picked = await context.push<Place>('/passenger/map-picker');
+        if (picked == null || !context.mounted) return;
+        _quickPickPlace(context, ref, picked);
+    }
+  }
+
+  /// City coords keyed by explore id. Bypasses [kDanangPlaces] lookup so
+  /// each carousel card always drops the user at the right intersection
+  /// (and the Directions API gets a real road snap point).
+  static const Map<String, (double, double, String)> _cityTargets = {
+    'city_danang': (16.0544, 108.2022, 'Trung tâm Đà Nẵng'),
+    'city_hoian': (15.8801, 108.3380, 'Phố cổ Hội An'),
+    'city_banahills': (15.9978, 107.9881, 'Bà Nà Hills'),
+    'city_mykhe': (16.0742, 108.2470, 'Biển Mỹ Khê'),
+  };
+
   void _onExploreTap(BuildContext context, WidgetRef ref, ExplorePlace ep) {
-    final match = kDanangPlaces.where((p) => p.name == ep.name);
-    final place = match.isNotEmpty
-        ? match.first
-        : Place(
+    final target = _cityTargets[ep.id];
+    final place = target == null
+        ? Place(
             id: ep.id,
             name: ep.name,
             address: ep.tagline,
             lat: 16.0544 + (ep.distanceKm * 0.001),
             lng: 108.2022,
+          )
+        : Place(
+            id: ep.id,
+            name: ep.name,
+            address: target.$3,
+            lat: target.$1,
+            lng: target.$2,
           );
     _quickPickPlace(context, ref, place);
   }
@@ -115,13 +160,7 @@ class PassengerHomeScreen extends ConsumerWidget {
               const SliverToBoxAdapter(child: SizedBox(height: 18)),
               SliverToBoxAdapter(
                 child: _QuickServicesGrid(
-                  onTileTap: (svc) {
-                    if (svc.comingSoon) {
-                      WgToast.info(context, '${svc.label} sẽ ra mắt sớm');
-                    } else {
-                      _openSearch(context);
-                    }
-                  },
+                  onTileTap: (svc) => _handleQuickService(context, ref, svc),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 18)),

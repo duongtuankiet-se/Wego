@@ -9,8 +9,10 @@ import 'screens/_dev/matching_test_screen.dart';
 import 'screens/_dev/seed_screen.dart';
 import 'screens/_dev/showcase_screen.dart';
 import 'screens/auth/login_screen.dart';
+import 'screens/auth/register_screen.dart';
 import 'screens/auth/role_select_screen.dart';
 import 'screens/auth/splash_screen.dart';
+import 'screens/auth/verify_otp_screen.dart';
 import 'screens/driver/driver_earnings_screen.dart';
 import 'screens/driver/driver_home_screen.dart';
 import 'screens/driver/driver_navigation_screen.dart';
@@ -50,14 +52,29 @@ GoRouter router(Ref ref) {
         path: '/role-select',
         builder: (context, state) => const RoleSelectScreen(),
       ),
+      GoRoute(path: '/login', builder: (context, state) => const LoginScreen()),
       GoRoute(
-        path: '/login',
+        path: '/register',
         builder: (context, state) {
           final roleParam = state.uri.queryParameters['role'] ?? 'passenger';
           final role = roleParam == 'driver'
               ? UserRole.driver
               : UserRole.passenger;
-          return LoginScreen(role: role);
+          return RegisterScreen(initialRole: role);
+        },
+      ),
+      GoRoute(
+        path: '/verify-otp',
+        builder: (context, state) {
+          final extra =
+              (state.extra as Map?)?.cast<String, Object>() ??
+              <String, Object>{};
+          return VerifyOtpScreen(
+            phone: extra['phone'] as String,
+            isRegister: extra['isRegister'] as bool? ?? false,
+            name: extra['name'] as String?,
+            role: extra['role'] as UserRole?,
+          );
         },
       ),
 
