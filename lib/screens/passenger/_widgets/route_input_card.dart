@@ -4,6 +4,9 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 
+/// Pickup (readonly) + dropoff (editable) inputs stacked vertically with
+/// a left-side dot→line→square connector. Inputs use a filled subtle
+/// ink50 background — no outline / focus ring, matching Xanh SM style.
 class RouteInputCard extends StatelessWidget {
   const RouteInputCard({
     super.key,
@@ -25,13 +28,12 @@ class RouteInputCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 12),
       child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
-          // Connector column (origin dot → line → destination square)
           Padding(
-            padding: const EdgeInsets.only(top: 18),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             child: Column(
               children: [
                 Container(
@@ -42,13 +44,13 @@ class RouteInputCard extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                 ),
-                Container(width: 1.5, height: 36, color: AppColors.ink300),
+                Container(width: 2, height: 28, color: AppColors.ink200),
                 Container(
                   width: 10,
                   height: 10,
                   decoration: BoxDecoration(
                     color: AppColors.danger,
-                    borderRadius: BorderRadius.circular(2),
+                    borderRadius: BorderRadius.circular(3),
                   ),
                 ),
               ],
@@ -57,65 +59,112 @@ class RouteInputCard extends StatelessWidget {
           const SizedBox(width: 14),
           Expanded(
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
               children: [
-                // Pickup row (readonly)
-                InkWell(
-                  onTap: onPickupTap,
-                  child: SizedBox(
-                    height: 48,
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            pickupLabel,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: AppTypography.body.copyWith(
-                              color: AppColors.ink900,
-                              fontWeight: FontWeight.w600,
-                            ),
-                          ),
-                        ),
-                        const Icon(
-                          PhosphorIconsRegular.pencilSimple,
-                          color: AppColors.ink500,
-                          size: 16,
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                const Divider(height: 1, color: AppColors.ink100),
-                // Dropoff input (editable)
-                SizedBox(
-                  height: 48,
-                  child: Align(
-                    alignment: Alignment.centerLeft,
-                    child: TextField(
-                      controller: dropoffController,
-                      autofocus: autofocusDropoff,
-                      onChanged: onDropoffChanged,
-                      onSubmitted: onDropoffSubmitted,
-                      textInputAction: TextInputAction.search,
-                      cursorColor: AppColors.primary500,
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.ink900,
-                        fontWeight: FontWeight.w600,
-                      ),
-                      decoration: InputDecoration.collapsed(
-                        hintText: 'Nhập điểm đến...',
-                        hintStyle: AppTypography.body.copyWith(
-                          color: AppColors.ink500,
-                        ),
-                      ),
-                    ),
-                  ),
+                _PickupField(label: pickupLabel, onTap: onPickupTap),
+                const SizedBox(height: 8),
+                _DropoffField(
+                  controller: dropoffController,
+                  autofocus: autofocusDropoff,
+                  onChanged: onDropoffChanged,
+                  onSubmitted: onDropoffSubmitted,
                 ),
               ],
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _PickupField extends StatelessWidget {
+  const _PickupField({required this.label, required this.onTap});
+  final String label;
+  final VoidCallback? onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppColors.ink50,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: Text(
+                label,
+                style: AppTypography.body.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.ink900,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Icon(
+              PhosphorIconsRegular.pencilSimple,
+              size: 16,
+              color: AppColors.ink500,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _DropoffField extends StatelessWidget {
+  const _DropoffField({
+    required this.controller,
+    required this.autofocus,
+    required this.onChanged,
+    required this.onSubmitted,
+  });
+  final TextEditingController controller;
+  final bool autofocus;
+  final ValueChanged<String> onChanged;
+  final ValueChanged<String>? onSubmitted;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.ink50,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: TextField(
+        controller: controller,
+        autofocus: autofocus,
+        onChanged: onChanged,
+        onSubmitted: onSubmitted,
+        textInputAction: TextInputAction.search,
+        cursorColor: AppColors.primary500,
+        style: AppTypography.body.copyWith(
+          fontWeight: FontWeight.w600,
+          color: AppColors.ink900,
+        ),
+        decoration: InputDecoration(
+          hintText: 'Bạn muốn đến đâu?',
+          hintStyle: AppTypography.body.copyWith(
+            color: AppColors.ink400,
+            fontWeight: FontWeight.w400,
+          ),
+          border: InputBorder.none,
+          enabledBorder: InputBorder.none,
+          focusedBorder: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: 12,
+          ),
+          isDense: true,
+        ),
       ),
     );
   }
