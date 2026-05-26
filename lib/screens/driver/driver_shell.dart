@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/widgets/wg_bottom_tab_bar.dart';
 
@@ -8,30 +9,30 @@ class DriverShell extends StatelessWidget {
 
   final StatefulNavigationShell navigationShell;
 
-  static const _items = [
+  static final _items = [
     WgTabItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
+      icon: PhosphorIconsRegular.house,
+      activeIcon: PhosphorIconsFill.house,
       label: 'Trang chủ',
     ),
     WgTabItem(
-      icon: Icons.attach_money,
-      activeIcon: Icons.attach_money,
+      icon: PhosphorIconsRegular.currencyDollar,
+      activeIcon: PhosphorIconsFill.currencyDollar,
       label: 'Thu nhập',
     ),
     WgTabItem(
-      icon: Icons.account_balance_wallet_outlined,
-      activeIcon: Icons.account_balance_wallet,
+      icon: PhosphorIconsRegular.wallet,
+      activeIcon: PhosphorIconsFill.wallet,
       label: 'Ví',
     ),
     WgTabItem(
-      icon: Icons.trending_up,
-      activeIcon: Icons.trending_up,
+      icon: PhosphorIconsRegular.trendUp,
+      activeIcon: PhosphorIconsFill.trendUp,
       label: 'Hiệu suất',
     ),
     WgTabItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person,
+      icon: PhosphorIconsRegular.user,
+      activeIcon: PhosphorIconsFill.user,
       label: 'Tôi',
     ),
   ];

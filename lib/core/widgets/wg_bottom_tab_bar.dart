@@ -2,6 +2,7 @@ import 'dart:ui';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -35,30 +36,30 @@ class WgBottomTabBar extends StatelessWidget {
   final List<WgTabItem>? items;
   final ValueChanged<int>? onTap;
 
-  static const List<WgTabItem> _defaultItems = [
+  static final List<WgTabItem> _defaultItems = [
     WgTabItem(
-      icon: Icons.home_outlined,
-      activeIcon: Icons.home_rounded,
+      icon: PhosphorIconsRegular.house,
+      activeIcon: PhosphorIconsFill.house,
       label: 'Trang chủ',
     ),
     WgTabItem(
-      icon: Icons.access_time,
-      activeIcon: Icons.access_time_filled,
+      icon: PhosphorIconsRegular.clock,
+      activeIcon: PhosphorIconsFill.clock,
       label: 'Hoạt động',
     ),
     WgTabItem(
-      icon: Icons.card_giftcard_outlined,
-      activeIcon: Icons.card_giftcard,
+      icon: PhosphorIconsRegular.gift,
+      activeIcon: PhosphorIconsFill.gift,
       label: 'Ưu đãi',
     ),
     WgTabItem(
-      icon: Icons.support_agent_outlined,
-      activeIcon: Icons.support_agent,
+      icon: PhosphorIconsRegular.headset,
+      activeIcon: PhosphorIconsFill.headset,
       label: 'Hỗ trợ',
     ),
     WgTabItem(
-      icon: Icons.person_outline,
-      activeIcon: Icons.person,
+      icon: PhosphorIconsRegular.user,
+      activeIcon: PhosphorIconsFill.user,
       label: 'Tôi',
     ),
   ];
