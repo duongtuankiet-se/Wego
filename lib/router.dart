@@ -128,8 +128,7 @@ GoRouter router(Ref ref) {
       // ── Driver shell — 5 tabs ─────────────────────────────────────
       StatefulShellRoute.indexedStack(
         parentNavigatorKey: _rootKey,
-        builder: (context, state, shell) =>
-            DriverShell(navigationShell: shell),
+        builder: (context, state, shell) => DriverShell(navigationShell: shell),
         branches: [
           StatefulShellBranch(
             navigatorKey: _driverKey,

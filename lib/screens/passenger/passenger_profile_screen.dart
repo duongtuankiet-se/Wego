@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -54,7 +55,7 @@ class PassengerProfileScreen extends ConsumerWidget {
         title: const Text('Tôi'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.settings_outlined),
+            icon: const Icon(PhosphorIconsRegular.gear),
             onPressed: () => WgToast.info(context, 'Cài đặt sắp ra mắt'),
           ),
         ],
@@ -68,19 +69,19 @@ class PassengerProfileScreen extends ConsumerWidget {
           _SettingsGroup(
             children: [
               WgListTile(
-                icon: Icons.place_outlined,
+                icon: PhosphorIconsRegular.mapPin,
                 title: 'Địa điểm đã lưu',
                 onTap: () => WgToast.info(context, 'Tính năng đang phát triển'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.credit_card_outlined,
+                icon: PhosphorIconsRegular.creditCard,
                 title: 'Phương thức thanh toán',
                 onTap: () => WgToast.info(context, 'Tính năng đang phát triển'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.language_outlined,
+                icon: PhosphorIconsRegular.globe,
                 title: 'Ngôn ngữ',
                 value: 'Tiếng Việt',
                 onTap: () => WgToast.info(context, 'Đa ngôn ngữ sắp ra mắt'),
@@ -92,19 +93,19 @@ class PassengerProfileScreen extends ConsumerWidget {
           _SettingsGroup(
             children: [
               WgListTile(
-                icon: Icons.notifications_outlined,
+                icon: PhosphorIconsRegular.bell,
                 title: 'Thông báo',
                 onTap: () => WgToast.info(context, 'Tính năng đang phát triển'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.shield_outlined,
+                icon: PhosphorIconsRegular.shield,
                 title: 'Bảo mật & Quyền riêng tư',
                 onTap: () => WgToast.info(context, 'Tính năng đang phát triển'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.description_outlined,
+                icon: PhosphorIconsRegular.fileText,
                 title: 'Điều khoản & Chính sách',
                 onTap: () => WgToast.info(context, 'Tính năng đang phát triển'),
               ),
@@ -115,20 +116,21 @@ class PassengerProfileScreen extends ConsumerWidget {
           _SettingsGroup(
             children: [
               WgListTile(
-                icon: Icons.help_outline_rounded,
+                icon: PhosphorIconsRegular.question,
                 title: 'Trung tâm trợ giúp',
-                onTap: () => WgToast.info(context, 'Vào tab "Hỗ trợ" để xem FAQ'),
+                onTap: () =>
+                    WgToast.info(context, 'Vào tab "Hỗ trợ" để xem FAQ'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.phone_outlined,
+                icon: PhosphorIconsRegular.phone,
                 title: 'Liên hệ WeGo',
                 value: '1900 1234',
                 onTap: () => WgToast.info(context, 'Đang gọi 1900 1234...'),
               ),
               const Divider(height: 1, color: AppColors.ink100, indent: 70),
               WgListTile(
-                icon: Icons.star_outline_rounded,
+                icon: PhosphorIconsRegular.star,
                 title: 'Đánh giá ứng dụng',
                 onTap: () => WgToast.info(context, 'Cảm ơn bạn yêu WeGo!'),
               ),
@@ -137,7 +139,7 @@ class PassengerProfileScreen extends ConsumerWidget {
           const SizedBox(height: 24),
           WgButton.secondary(
             label: 'Đăng xuất',
-            leadingIcon: Icons.logout,
+            leadingIcon: PhosphorIconsRegular.signOut,
             isFullWidth: true,
             onPressed: () => _confirmLogout(context, ref),
           ),
@@ -190,14 +192,16 @@ class _UserCard extends StatelessWidget {
           const SizedBox(height: 16),
           OutlinedButton.icon(
             onPressed: () {},
-            icon: const Icon(Icons.edit_outlined, size: 16),
+            icon: const Icon(PhosphorIconsRegular.pencilSimple, size: 16),
             label: const Text('Chỉnh sửa hồ sơ'),
             style: OutlinedButton.styleFrom(
               foregroundColor: AppColors.primary500,
               side: BorderSide(
                 color: AppColors.primary500.withValues(alpha: 0.3),
               ),
-              shape: const RoundedRectangleBorder(borderRadius: AppRadius.button),
+              shape: const RoundedRectangleBorder(
+                borderRadius: AppRadius.button,
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
             ),
           ),

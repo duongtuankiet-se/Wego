@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 class TurnInstruction {
   final IconData icon;
@@ -20,28 +21,28 @@ class TurnInstruction {
 /// Order is meaningful: assumes the driver heads toward downtown Đà Nẵng.
 const List<TurnInstruction> kTurnInstructions = [
   TurnInstruction(
-    icon: Icons.turn_right,
+    icon: PhosphorIconsRegular.arrowBendUpRight,
     action: 'Rẽ phải vào',
     streetName: 'Nguyễn Văn Linh',
     distanceMeters: 250,
     nextHint: 'Đi thẳng 1.4 km',
   ),
   TurnInstruction(
-    icon: Icons.arrow_upward,
+    icon: PhosphorIconsRegular.arrowUp,
     action: 'Đi thẳng',
     streetName: 'Nguyễn Văn Linh',
     distanceMeters: 1400,
     nextHint: 'Rẽ trái vào Trường Sa',
   ),
   TurnInstruction(
-    icon: Icons.turn_left,
+    icon: PhosphorIconsRegular.arrowBendUpLeft,
     action: 'Rẽ trái vào',
     streetName: 'Trường Sa',
     distanceMeters: 80,
     nextHint: 'Tiếp tục 600 m',
   ),
   TurnInstruction(
-    icon: Icons.directions_car,
+    icon: PhosphorIconsFill.car,
     action: 'Tiếp tục thẳng',
     streetName: 'Trường Sa',
     distanceMeters: 600,

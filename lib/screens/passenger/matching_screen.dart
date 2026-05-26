@@ -4,6 +4,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -243,7 +244,10 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
               right: 8,
               child: IconButton(
                 onPressed: _cancelFlow,
-                icon: const Icon(Icons.close, color: AppColors.ink700),
+                icon: const Icon(
+                  PhosphorIconsRegular.x,
+                  color: AppColors.ink700,
+                ),
               ),
             ),
             Padding(
@@ -342,7 +346,11 @@ class _StepRow extends StatelessWidget {
         switch (status) {
           _StepStatus.done => (
             bg: AppColors.primary500,
-            child: const Icon(Icons.check, color: Colors.white, size: 14),
+            child: const Icon(
+              PhosphorIconsBold.check,
+              color: Colors.white,
+              size: 14,
+            ),
             textColor: AppColors.ink900,
             weight: FontWeight.w500,
           ),
@@ -463,7 +471,7 @@ class _PulseLogo extends StatelessWidget {
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.directions_car_rounded,
+                    PhosphorIconsFill.car,
                     color: Colors.white,
                     size: 28,
                   ),

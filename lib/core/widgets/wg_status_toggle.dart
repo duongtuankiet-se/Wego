@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -75,7 +76,9 @@ class WgStatusToggle extends StatelessWidget {
                     ],
                   ),
                   child: Icon(
-                    online ? Icons.power_settings_new : Icons.power_off,
+                    online
+                        ? PhosphorIconsFill.power
+                        : PhosphorIconsRegular.power,
                     color: online ? AppColors.white : AppColors.ink500,
                     size: 22,
                   ),

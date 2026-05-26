@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -111,7 +112,7 @@ class DriverProfileScreen extends ConsumerWidget {
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
                           const Icon(
-                            Icons.star_rounded,
+                            PhosphorIconsFill.star,
                             color: AppColors.warning,
                             size: 16,
                           ),
@@ -133,57 +134,63 @@ class DriverProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 20),
           _SectionTitle('Phương tiện'),
-          _Group(children: [
-            WgListTile(
-              icon: Icons.directions_car_filled_outlined,
-              title: driver?.vehicleModel ?? 'Xe',
-              subtitle:
-                  '${driver?.vehicleColor ?? "—"} · ${driver?.vehiclePlate ?? "—"}',
-              onTap: () => WgToast.info(context, 'Chỉnh sửa xe sắp ra mắt'),
-            ),
-            const Divider(height: 1, color: AppColors.ink100, indent: 70),
-            WgListTile(
-              icon: Icons.description_outlined,
-              title: 'Giấy tờ & Đăng ký',
-              value: 'Đã xác minh',
-              onTap: () => WgToast.info(context, 'Tài liệu sắp ra mắt'),
-            ),
-          ]),
+          _Group(
+            children: [
+              WgListTile(
+                icon: PhosphorIconsRegular.car,
+                title: driver?.vehicleModel ?? 'Xe',
+                subtitle:
+                    '${driver?.vehicleColor ?? "—"} · ${driver?.vehiclePlate ?? "—"}',
+                onTap: () => WgToast.info(context, 'Chỉnh sửa xe sắp ra mắt'),
+              ),
+              const Divider(height: 1, color: AppColors.ink100, indent: 70),
+              WgListTile(
+                icon: PhosphorIconsRegular.fileText,
+                title: 'Giấy tờ & Đăng ký',
+                value: 'Đã xác minh',
+                onTap: () => WgToast.info(context, 'Tài liệu sắp ra mắt'),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           _SectionTitle('Cài đặt'),
-          _Group(children: [
-            WgListTile(
-              icon: Icons.notifications_outlined,
-              title: 'Thông báo',
-              onTap: () => WgToast.info(context, 'Sắp ra mắt'),
-            ),
-            const Divider(height: 1, color: AppColors.ink100, indent: 70),
-            WgListTile(
-              icon: Icons.shield_outlined,
-              title: 'Bảo mật',
-              onTap: () => WgToast.info(context, 'Sắp ra mắt'),
-            ),
-          ]),
+          _Group(
+            children: [
+              WgListTile(
+                icon: PhosphorIconsRegular.bell,
+                title: 'Thông báo',
+                onTap: () => WgToast.info(context, 'Sắp ra mắt'),
+              ),
+              const Divider(height: 1, color: AppColors.ink100, indent: 70),
+              WgListTile(
+                icon: PhosphorIconsRegular.shield,
+                title: 'Bảo mật',
+                onTap: () => WgToast.info(context, 'Sắp ra mắt'),
+              ),
+            ],
+          ),
           const SizedBox(height: 16),
           _SectionTitle('Hỗ trợ'),
-          _Group(children: [
-            WgListTile(
-              icon: Icons.help_outline,
-              title: 'Trung tâm trợ giúp tài xế',
-              onTap: () => WgToast.info(context, 'Sắp ra mắt'),
-            ),
-            const Divider(height: 1, color: AppColors.ink100, indent: 70),
-            WgListTile(
-              icon: Icons.phone_outlined,
-              title: 'Hotline tài xế',
-              value: '1900 5678',
-              onTap: () => WgToast.info(context, 'Đang gọi 1900 5678...'),
-            ),
-          ]),
+          _Group(
+            children: [
+              WgListTile(
+                icon: PhosphorIconsRegular.question,
+                title: 'Trung tâm trợ giúp tài xế',
+                onTap: () => WgToast.info(context, 'Sắp ra mắt'),
+              ),
+              const Divider(height: 1, color: AppColors.ink100, indent: 70),
+              WgListTile(
+                icon: PhosphorIconsRegular.phone,
+                title: 'Hotline tài xế',
+                value: '1900 5678',
+                onTap: () => WgToast.info(context, 'Đang gọi 1900 5678...'),
+              ),
+            ],
+          ),
           const SizedBox(height: 24),
           WgButton.secondary(
             label: 'Đăng xuất',
-            leadingIcon: Icons.logout,
+            leadingIcon: PhosphorIconsRegular.signOut,
             isFullWidth: true,
             onPressed: () => _confirmLogout(context, ref),
           ),

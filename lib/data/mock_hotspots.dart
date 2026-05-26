@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 
@@ -40,7 +41,7 @@ const List<Hotspot> kHotspots = [
     distanceKm: 4.2,
     heatColor: AppColors.danger,
     heatRadius: 80,
-    icon: Icons.flight,
+    icon: PhosphorIconsFill.airplane,
   ),
   Hotspot(
     id: 'h2',
@@ -52,7 +53,7 @@ const List<Hotspot> kHotspots = [
     distanceKm: 2.1,
     heatColor: AppColors.warning,
     heatRadius: 60,
-    icon: Icons.storefront,
+    icon: PhosphorIconsFill.storefront,
   ),
   Hotspot(
     id: 'h3',
@@ -64,6 +65,6 @@ const List<Hotspot> kHotspots = [
     distanceKm: 1.4,
     heatColor: Color(0xFFFFC107),
     heatRadius: 50,
-    icon: Icons.location_city,
+    icon: PhosphorIconsFill.buildings,
   ),
 ];

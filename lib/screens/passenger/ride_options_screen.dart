@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -74,7 +75,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Chọn chuyến xe'),
@@ -115,7 +116,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: RideTypeCard(
-                  icon: Icons.groups_rounded,
+                  icon: PhosphorIconsFill.usersThree,
                   title: 'Xe ghép thông minh',
                   etaLabel: 'Đón sau 4-6 phút · Chia sẻ tuyến',
                   price: sharedFare,
@@ -133,7 +134,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: RideTypeCard(
-                  icon: Icons.directions_car_rounded,
+                  icon: PhosphorIconsFill.car,
                   title: 'Xe 4 chỗ riêng',
                   etaLabel: 'Đón sau 2-3 phút',
                   price: baseFare,
@@ -149,7 +150,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
               child: Padding(
                 padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                 child: RideTypeCard(
-                  icon: Icons.airport_shuttle_rounded,
+                  icon: PhosphorIconsFill.van,
                   title: 'Xe 7 chỗ',
                   etaLabel: 'Đón sau 3-5 phút · Nhiều hành lý',
                   price: sevenSeatFare,
@@ -161,10 +162,10 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
             ),
             const SizedBox(height: 8),
             _BottomRow(
-              icon: Icons.payments_outlined,
+              icon: PhosphorIconsRegular.money,
               label: 'Tiền mặt',
               trailing: const Icon(
-                Icons.chevron_right,
+                PhosphorIconsRegular.caretRight,
                 color: AppColors.ink300,
                 size: 18,
               ),
@@ -172,11 +173,11 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
                   WgToast.info(context, 'Đổi PTTT có ở màn Trip Summary'),
             ),
             _BottomRow(
-              icon: Icons.local_offer_outlined,
+              icon: PhosphorIconsRegular.tag,
               label: 'WEGO50 −${formatVnd(_kPromoDiscount)}',
               labelColor: AppColors.primary500,
               trailing: const Icon(
-                Icons.chevron_right,
+                PhosphorIconsRegular.caretRight,
                 color: AppColors.ink300,
                 size: 18,
               ),
@@ -230,7 +231,7 @@ class _StickyCta extends StatelessWidget {
         label: label,
         size: WgButtonSize.lg,
         isFullWidth: true,
-        trailingIcon: Icons.arrow_forward_rounded,
+        trailingIcon: PhosphorIconsRegular.arrowRight,
         onPressed: onPressed,
       ),
     );
@@ -291,7 +292,7 @@ class _MissingDropoff extends StatelessWidget {
             mainAxisSize: MainAxisSize.min,
             children: [
               const Icon(
-                Icons.error_outline,
+                PhosphorIconsRegular.warningCircle,
                 color: AppColors.warning,
                 size: 56,
               ),

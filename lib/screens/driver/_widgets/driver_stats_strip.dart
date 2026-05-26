@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -37,23 +38,28 @@ class DriverStatsStrip extends StatelessWidget {
       child: Row(
         children: [
           _cell(
-            Icons.attach_money,
+            PhosphorIconsRegular.currencyDollar,
             AppColors.success,
             earningsLabel,
             'Thu nhập',
           ),
           const _Divider(),
           _cell(
-            Icons.directions_car,
+            PhosphorIconsFill.car,
             AppColors.primary500,
             '$tripCount',
             'Chuyến',
           ),
           const _Divider(),
-          _cell(Icons.access_time, AppColors.warning, activeLabel, 'Hoạt động'),
+          _cell(
+            PhosphorIconsRegular.clock,
+            AppColors.warning,
+            activeLabel,
+            'Hoạt động',
+          ),
           const _Divider(),
           _cell(
-            Icons.star,
+            PhosphorIconsFill.star,
             AppColors.warning,
             rating > 0 ? rating.toStringAsFixed(2) : '—',
             'Đánh giá',

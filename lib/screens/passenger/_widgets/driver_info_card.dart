@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -57,7 +58,7 @@ class DriverInfoCard extends StatelessWidget {
                     Row(
                       children: [
                         const Icon(
-                          Icons.star_rounded,
+                          PhosphorIconsFill.star,
                           color: AppColors.warning,
                           size: 16,
                         ),
@@ -74,14 +75,14 @@ class DriverInfoCard extends StatelessWidget {
                 ),
               ),
               _IconButton(
-                icon: Icons.chat_bubble_outline,
+                icon: PhosphorIconsRegular.chatCircle,
                 bg: AppColors.ink100,
                 fg: AppColors.ink700,
                 onTap: () => _chat(context),
               ),
               const SizedBox(width: 8),
               _IconButton(
-                icon: Icons.phone,
+                icon: PhosphorIconsFill.phone,
                 bg: AppColors.primary500,
                 fg: Colors.white,
                 onTap: () => _call(context),

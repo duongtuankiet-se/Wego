@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -112,7 +113,9 @@ class _WgInputState extends State<WgInput> {
               suffixIcon: isPassword
                   ? IconButton(
                       icon: Icon(
-                        _obscure ? Icons.visibility_off : Icons.visibility,
+                        _obscure
+                            ? PhosphorIconsRegular.eyeSlash
+                            : PhosphorIconsRegular.eye,
                         color: AppColors.ink500,
                         size: 20,
                       ),

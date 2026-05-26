@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../core/theme/app_colors.dart';
 
@@ -30,7 +31,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Áp dụng cho chuyến đầu tiên với WeGo',
       expiresAt: eoy,
       gradient: const [AppColors.primary500, AppColors.primary700],
-      icon: Icons.celebration_outlined,
+      icon: PhosphorIconsRegular.confetti,
     ),
     PromoVoucher(
       code: 'HOLIDAY30',
@@ -38,7 +39,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Áp dụng T7 & CN cho mọi chuyến dưới 100k',
       expiresAt: midYear,
       gradient: const [Color(0xFFEF4444), Color(0xFFC2410C)],
-      icon: Icons.weekend_outlined,
+      icon: PhosphorIconsRegular.couch,
     ),
     PromoVoucher(
       code: 'SUMMER100',
@@ -46,7 +47,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Cho chuyến đặt từ 200k trở lên trong hè',
       expiresAt: midYear,
       gradient: const [Color(0xFFF59E0B), Color(0xFFB45309)],
-      icon: Icons.beach_access_outlined,
+      icon: PhosphorIconsRegular.umbrella,
     ),
     PromoVoucher(
       code: 'AIRPORT15',
@@ -54,7 +55,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Đặt chuyến đi/đến Sân bay Đà Nẵng',
       expiresAt: eoy,
       gradient: const [AppColors.sharedAccent, Color(0xFF0E7490)],
-      icon: Icons.flight_takeoff,
+      icon: PhosphorIconsFill.airplaneTakeoff,
     ),
     PromoVoucher(
       code: 'SHARE38',
@@ -62,7 +63,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Khi chọn Xe ghép thông minh — tự động áp dụng',
       expiresAt: eoy,
       gradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
-      icon: Icons.groups_outlined,
+      icon: PhosphorIconsRegular.usersThree,
     ),
     PromoVoucher(
       code: 'NEWUSER',
@@ -70,7 +71,7 @@ List<PromoVoucher> generateMockPromos() {
       description: 'Giới thiệu bạn mới — cả 2 cùng nhận voucher',
       expiresAt: eoy,
       gradient: const [Color(0xFFD4A574), Color(0xFF8B6F47)],
-      icon: Icons.card_giftcard_outlined,
+      icon: PhosphorIconsRegular.gift,
     ),
   ];
 }

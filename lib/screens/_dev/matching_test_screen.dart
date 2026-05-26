@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -210,7 +211,7 @@ class _MatchingTestScreenState extends ConsumerState<MatchingTestScreen> {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Matching Engine Test'),
@@ -218,7 +219,7 @@ class _MatchingTestScreenState extends ConsumerState<MatchingTestScreen> {
           IconButton(
             tooltip: 'Xoá log',
             onPressed: () => setState(_log.clear),
-            icon: const Icon(Icons.clear_all),
+            icon: const Icon(PhosphorIconsRegular.broom),
           ),
         ],
       ),
@@ -233,27 +234,27 @@ class _MatchingTestScreenState extends ConsumerState<MatchingTestScreen> {
           const SizedBox(height: 16),
           _btn(
             '1. Seed 5 drivers online ngẫu nhiên ở Đà Nẵng',
-            Icons.add_location_alt,
+            PhosphorIconsRegular.mapPinPlus,
             () => _wrap(_seedDrivers, 'seedDrivers'),
           ),
           _btn(
             '2. Tìm driver gần Cầu Rồng nhất',
-            Icons.near_me,
+            PhosphorIconsFill.navigationArrow,
             () => _wrap(_testNearest, 'findNearestDriver'),
           ),
           _btn(
             '3. Tạo 1 trip pending (Sân bay → Chợ Hàn, shared)',
-            Icons.note_add,
+            PhosphorIconsRegular.notePencil,
             () => _wrap(_createPendingTrip, 'insertPendingTrip'),
           ),
           _btn(
             '4. Tìm carpool match cho pickup gần Sân bay',
-            Icons.groups,
+            PhosphorIconsFill.usersThree,
             () => _wrap(_testCarpool, 'findCarpoolMatch'),
           ),
           _btn(
             '5. Reset: xoá pending trips + 5 demo drivers',
-            Icons.refresh,
+            PhosphorIconsRegular.arrowsClockwise,
             () => _wrap(_resetMatchingData, 'reset'),
             warning: true,
           ),

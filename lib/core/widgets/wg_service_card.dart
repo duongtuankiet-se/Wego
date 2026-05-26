@@ -20,9 +20,7 @@ class WgServiceCard extends StatelessWidget {
   });
 
   /// Shortcut for the primary "Đặt xe" tile.
-  factory WgServiceCard.bookRide({
-    required VoidCallback onTap,
-  }) =>
+  factory WgServiceCard.bookRide({required VoidCallback onTap}) =>
       WgServiceCard(
         title: 'Đặt xe',
         subtitle: 'Đi đâu cũng được',
@@ -32,9 +30,7 @@ class WgServiceCard extends StatelessWidget {
       );
 
   /// Shortcut for the food-delivery teaser tile (mocked).
-  factory WgServiceCard.bookFood({
-    required VoidCallback onTap,
-  }) =>
+  factory WgServiceCard.bookFood({required VoidCallback onTap}) =>
       WgServiceCard(
         title: 'Đặt đồ ăn',
         subtitle: 'Giao siêu tốc',
@@ -77,10 +73,7 @@ class WgServiceCard extends StatelessWidget {
               Positioned(
                 right: -6,
                 bottom: -10,
-                child: Text(
-                  emoji,
-                  style: const TextStyle(fontSize: 76),
-                ),
+                child: Text(emoji, style: const TextStyle(fontSize: 76)),
               ),
               Padding(
                 padding: const EdgeInsets.all(18),

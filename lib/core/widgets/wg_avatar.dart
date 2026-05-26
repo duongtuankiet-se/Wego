@@ -1,5 +1,6 @@
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 
@@ -70,7 +71,11 @@ class WgAvatar extends StatelessWidget {
               child: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Icon(Icons.star, size: 10, color: Colors.white),
+                  const Icon(
+                    PhosphorIconsFill.star,
+                    size: 10,
+                    color: Colors.white,
+                  ),
                   const SizedBox(width: 2),
                   Text(
                     rating!.toStringAsFixed(1),

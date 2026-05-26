@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
@@ -35,7 +36,7 @@ class PassengerSupportScreen extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 const Icon(
-                  Icons.support_agent,
+                  PhosphorIconsFill.headset,
                   color: Colors.white,
                   size: 36,
                 ),
@@ -57,7 +58,7 @@ class PassengerSupportScreen extends StatelessWidget {
                 const SizedBox(height: 16),
                 WgButton.secondary(
                   label: 'Chat với CSKH',
-                  leadingIcon: Icons.chat_bubble_outline,
+                  leadingIcon: PhosphorIconsRegular.chatCircle,
                   onPressed: () =>
                       WgToast.info(context, 'Chat sẽ có ở phiên bản sau'),
                 ),
@@ -109,8 +110,7 @@ class PassengerSupportScreen extends StatelessWidget {
                       ),
                     ),
                     body: Padding(
-                      padding:
-                          const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
                       child: Align(
                         alignment: Alignment.centerLeft,
                         child: Text(
@@ -148,21 +148,18 @@ class PassengerSupportScreen extends StatelessWidget {
             child: Column(
               children: [
                 WgListTile(
-                  icon: Icons.phone_outlined,
+                  icon: PhosphorIconsRegular.phone,
                   title: 'Hotline 24/7',
                   value: '1900 1234',
-                  onTap: () =>
-                      WgToast.info(context, 'Đang gọi 1900 1234...'),
+                  onTap: () => WgToast.info(context, 'Đang gọi 1900 1234...'),
                 ),
                 const Divider(height: 1, color: AppColors.ink100, indent: 70),
                 WgListTile(
-                  icon: Icons.email_outlined,
+                  icon: PhosphorIconsRegular.envelope,
                   title: 'Email hỗ trợ',
                   value: 'support@wego.vn',
-                  onTap: () => WgToast.info(
-                    context,
-                    'Đã sao chép support@wego.vn',
-                  ),
+                  onTap: () =>
+                      WgToast.info(context, 'Đã sao chép support@wego.vn'),
                 ),
               ],
             ),

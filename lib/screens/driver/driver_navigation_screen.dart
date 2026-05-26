@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -292,7 +293,9 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
             child: Column(
               children: [
                 _CircleBtn(
-                  icon: _muted ? Icons.volume_off : Icons.volume_up_outlined,
+                  icon: _muted
+                      ? PhosphorIconsRegular.speakerSlash
+                      : PhosphorIconsRegular.speakerHigh,
                   onTap: () {
                     setState(() => _muted = !_muted);
                     WgToast.info(
@@ -303,13 +306,11 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
                 ),
                 const SizedBox(height: 12),
                 _CircleBtn(
-                  icon: Icons.my_location,
+                  icon: PhosphorIconsFill.crosshair,
                   iconColor: AppColors.primary500,
                   onTap: () {
                     HapticFeedback.mediumImpact();
-                    _map?.animateCamera(
-                      CameraUpdate.newLatLngZoom(carPos, 16),
-                    );
+                    _map?.animateCamera(CameraUpdate.newLatLngZoom(carPos, 16));
                   },
                 ),
               ],
@@ -347,7 +348,6 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     ),
   );
 }
-
 
 class _SpeedLimitBadge extends StatelessWidget {
   @override
@@ -490,11 +490,11 @@ class _BottomPanel extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               _stat(
-                Icons.access_time,
+                PhosphorIconsRegular.clock,
                 '${((1 - progress) * 12).ceil()}p',
                 'còn lại',
               ),
-              _stat(Icons.straighten, '8.4 km', 'tổng'),
+              _stat(PhosphorIconsRegular.ruler, '8.4 km', 'tổng'),
               Column(
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
@@ -549,7 +549,7 @@ class _BottomPanel extends StatelessWidget {
               _PassengerAction(
                 bg: AppColors.ink100,
                 fg: AppColors.ink700,
-                icon: Icons.chat_bubble_outline,
+                icon: PhosphorIconsRegular.chatCircle,
                 onTap: () =>
                     WgToast.info(context, 'Chat sẽ có ở phiên bản sau'),
               ),
@@ -557,7 +557,7 @@ class _BottomPanel extends StatelessWidget {
               _PassengerAction(
                 bg: AppColors.primary500,
                 fg: Colors.white,
-                icon: Icons.phone,
+                icon: PhosphorIconsFill.phone,
                 onTap: () => WgToast.info(context, 'Đang kết nối...'),
               ),
             ],
@@ -648,7 +648,7 @@ class _StateCta extends StatelessWidget {
         label: '✓ Đón khách',
         size: WgButtonSize.lg,
         isFullWidth: true,
-        leadingIcon: Icons.check_circle_outline,
+        leadingIcon: PhosphorIconsRegular.checkCircle,
         onPressed: onPickup,
       ),
       _Phase.toDropoff => WgButton.secondary(

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -13,19 +14,19 @@ class TransactionItem extends StatelessWidget {
     if (txn.amount > 0) {
       if (txn.kind == TxnKind.bonus) {
         return (
-          icon: Icons.card_giftcard,
+          icon: PhosphorIconsFill.gift,
           color: const Color(0xFFD4A574),
           bg: const Color(0xFFFFF8EC),
         );
       }
       return (
-        icon: Icons.arrow_downward_rounded,
+        icon: PhosphorIconsRegular.arrowDown,
         color: AppColors.success,
         bg: AppColors.success.withValues(alpha: 0.15),
       );
     }
     return (
-      icon: Icons.arrow_upward_rounded,
+      icon: PhosphorIconsRegular.arrowUp,
       color: AppColors.danger,
       bg: AppColors.danger.withValues(alpha: 0.15),
     );

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -154,7 +155,7 @@ class _IncomingDialogState extends State<_IncomingDialog> {
                             Row(
                               children: [
                                 const Icon(
-                                  Icons.star_rounded,
+                                  PhosphorIconsFill.star,
                                   color: AppColors.warning,
                                   size: 14,
                                 ),
@@ -201,7 +202,7 @@ class _IncomingDialogState extends State<_IncomingDialog> {
                       child: Row(
                         children: [
                           const Icon(
-                            Icons.groups,
+                            PhosphorIconsFill.usersThree,
                             color: AppColors.sharedAccent,
                             size: 18,
                           ),
@@ -361,12 +362,16 @@ class _MetricsRow extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         _metric(
-          Icons.straighten,
+          PhosphorIconsRegular.ruler,
           '${distanceKm.toStringAsFixed(1)} km',
           AppColors.ink900,
         ),
         _vDivider(),
-        _metric(Icons.access_time, '$durationMin phút', AppColors.ink900),
+        _metric(
+          PhosphorIconsRegular.clock,
+          '$durationMin phút',
+          AppColors.ink900,
+        ),
         _vDivider(),
         Column(
           crossAxisAlignment: CrossAxisAlignment.end,

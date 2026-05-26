@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -125,7 +126,7 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Seed demo data'),
@@ -147,7 +148,7 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.warning_amber_rounded,
+                    PhosphorIconsFill.warning,
                     color: AppColors.warning,
                     size: 24,
                   ),
@@ -170,7 +171,7 @@ class _SeedScreenState extends ConsumerState<SeedScreen> {
               size: WgButtonSize.lg,
               isFullWidth: true,
               isLoading: _busy,
-              leadingIcon: Icons.restart_alt,
+              leadingIcon: PhosphorIconsRegular.arrowsCounterClockwise,
               onPressed: _busy ? null : _reset,
             ),
             const SizedBox(height: 24),

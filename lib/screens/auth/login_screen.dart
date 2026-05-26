@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -68,7 +69,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Đăng nhập'),
@@ -99,7 +100,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   label: 'Họ và tên',
                   hint: 'Nguyễn Văn A',
                   controller: _nameCtrl,
-                  prefixIcon: Icons.person_outline,
+                  prefixIcon: PhosphorIconsRegular.userCircle,
                   validator: Validators.validateName,
                   textInputAction: TextInputAction.next,
                   enabled: !_loading,
@@ -110,7 +111,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   hint: '0905xxxxxx',
                   controller: _phoneCtrl,
                   variant: WgInputVariant.phone,
-                  prefixIcon: Icons.phone_outlined,
+                  prefixIcon: PhosphorIconsRegular.phone,
                   validator: Validators.validatePhone,
                   textInputAction: TextInputAction.done,
                   enabled: !_loading,

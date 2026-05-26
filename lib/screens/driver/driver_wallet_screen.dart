@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -25,7 +26,7 @@ class DriverWalletScreen extends ConsumerWidget {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Ví của tôi'),
@@ -77,7 +78,7 @@ class DriverWalletScreen extends ConsumerWidget {
               child: Row(
                 children: [
                   const Icon(
-                    Icons.add_circle_outline,
+                    PhosphorIconsRegular.plusCircle,
                     color: AppColors.primary500,
                     size: 22,
                   ),
@@ -194,7 +195,7 @@ class _BalanceCard extends StatelessWidget {
               Expanded(
                 child: WgButton.primary(
                   label: 'Rút tiền',
-                  leadingIcon: Icons.send_outlined,
+                  leadingIcon: PhosphorIconsRegular.paperPlaneRight,
                   onPressed: () => WgToast.info(context, 'Rút tiền sắp ra mắt'),
                 ),
               ),
@@ -202,7 +203,7 @@ class _BalanceCard extends StatelessWidget {
               Expanded(
                 child: WgButton.secondary(
                   label: 'Nạp',
-                  leadingIcon: Icons.add,
+                  leadingIcon: PhosphorIconsRegular.plus,
                   onPressed: () => WgToast.info(context, 'Nạp tiền sắp ra mắt'),
                 ),
               ),
@@ -288,7 +289,11 @@ class _AccountCard extends StatelessWidget {
             ),
           ),
           IconButton(
-            icon: const Icon(Icons.close, color: AppColors.ink500, size: 20),
+            icon: const Icon(
+              PhosphorIconsRegular.x,
+              color: AppColors.ink500,
+              size: 20,
+            ),
             onPressed: () => WgToast.info(context, 'Quản lý sắp ra mắt'),
           ),
         ],
@@ -316,7 +321,7 @@ class _DateGroup extends StatelessWidget {
             child: Row(
               children: [
                 const Icon(
-                  Icons.expand_more,
+                  PhosphorIconsRegular.caretDown,
                   color: AppColors.ink500,
                   size: 18,
                 ),

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../theme/app_colors.dart';
 import '../theme/app_typography.dart';
@@ -74,17 +75,17 @@ class _ToastWidgetState extends State<_ToastWidget>
     _ToastKind.success => (
       bg: AppColors.success,
       fg: Colors.white,
-      icon: Icons.check_circle,
+      icon: PhosphorIconsFill.checkCircle,
     ),
     _ToastKind.error => (
       bg: AppColors.danger,
       fg: Colors.white,
-      icon: Icons.error,
+      icon: PhosphorIconsFill.warningCircle,
     ),
     _ToastKind.info => (
       bg: AppColors.ink900,
       fg: Colors.white,
-      icon: Icons.info,
+      icon: PhosphorIconsFill.info,
     ),
   };
 

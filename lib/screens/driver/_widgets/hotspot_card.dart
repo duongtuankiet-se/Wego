@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -68,7 +69,7 @@ class HotspotCard extends StatelessWidget {
           WgButton.ghost(
             label: 'Chỉ đường',
             size: WgButtonSize.sm,
-            trailingIcon: Icons.arrow_forward_rounded,
+            trailingIcon: PhosphorIconsRegular.arrowRight,
             onPressed: onTap,
           ),
         ],

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_spacing.dart';
@@ -49,14 +50,14 @@ class RoleSelectScreen extends StatelessWidget {
               ),
               const SizedBox(height: AppSpacing.xxl),
               _RoleCard(
-                icon: Icons.person,
+                icon: PhosphorIconsFill.user,
                 title: 'Tôi là khách hàng',
                 subtitle: 'Đặt xe nhanh, đi ghép tiết kiệm',
                 onTap: () => context.push('/login?role=passenger'),
               ),
               const SizedBox(height: AppSpacing.lg),
               _RoleCard(
-                icon: Icons.directions_car,
+                icon: PhosphorIconsFill.car,
                 title: 'Tôi là tài xế',
                 subtitle: 'Nhận chuyến, tăng thu nhập',
                 onTap: () => context.push('/login?role=driver'),
@@ -132,7 +133,11 @@ class _RoleCard extends StatelessWidget {
                 ],
               ),
             ),
-            const Icon(Icons.chevron_right, color: AppColors.ink500, size: 24),
+            const Icon(
+              PhosphorIconsRegular.caretRight,
+              color: AppColors.ink500,
+              size: 24,
+            ),
           ],
         ),
       ),

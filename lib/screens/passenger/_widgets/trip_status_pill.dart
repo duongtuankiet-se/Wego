@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -9,7 +10,7 @@ class TripStatusPill extends StatelessWidget {
     super.key,
     required this.label,
     required this.emphasis,
-    this.icon = Icons.directions_car,
+    this.icon = PhosphorIconsFill.car,
   });
 
   /// Leading text, e.g. "Tài xế đến sau ".

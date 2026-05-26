@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -37,13 +38,13 @@ class _DriverEarningsScreenState extends ConsumerState<DriverEarningsScreen> {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Thu nhập'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.tune),
+            icon: const Icon(PhosphorIconsRegular.faders),
             onPressed: () => WgToast.info(context, 'Bộ lọc sắp ra mắt'),
           ),
         ],
@@ -115,7 +116,7 @@ class _DriverEarningsScreenState extends ConsumerState<DriverEarningsScreen> {
                                   borderRadius: BorderRadius.circular(12),
                                 ),
                                 child: const Icon(
-                                  Icons.directions_car,
+                                  PhosphorIconsFill.car,
                                   color: AppColors.primary500,
                                   size: 18,
                                 ),
@@ -234,7 +235,11 @@ class _HeroCard extends StatelessWidget {
           const SizedBox(height: 6),
           Row(
             children: [
-              const Icon(Icons.trending_up, color: AppColors.white, size: 16),
+              const Icon(
+                PhosphorIconsRegular.trendUp,
+                color: AppColors.white,
+                size: 16,
+              ),
               const SizedBox(width: 4),
               Text(
                 '+12% so với hôm qua',
@@ -427,7 +432,11 @@ class _EmptyRecent extends StatelessWidget {
       ),
       child: Column(
         children: [
-          const Icon(Icons.car_repair, color: AppColors.ink300, size: 48),
+          const Icon(
+            PhosphorIconsRegular.wrench,
+            color: AppColors.ink300,
+            size: 48,
+          ),
           const SizedBox(height: 8),
           Text(
             'Chưa có chuyến hôm nay.\nBật nhận chuyến để bắt đầu!',

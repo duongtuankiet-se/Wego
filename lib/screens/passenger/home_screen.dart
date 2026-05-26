@@ -57,9 +57,7 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
   void _onExploreTap(ExplorePlace ep) {
     // Convert ExplorePlace → Place by reading the matching mock entry
     // when ids overlap, else build a one-shot Place.
-    final match = kDanangPlaces.where(
-      (p) => p.name == ep.name,
-    );
+    final match = kDanangPlaces.where((p) => p.name == ep.name);
     final place = match.isNotEmpty
         ? match.first
         : Place(
@@ -92,9 +90,7 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
         child: SafeArea(
           child: CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(
-                child: _Header(user: user),
-              ),
+              SliverToBoxAdapter(child: _Header(user: user)),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(20, 4, 20, 14),
@@ -114,14 +110,14 @@ class _PassengerHomeScreenState extends ConsumerState<PassengerHomeScreen> {
                   padding: const EdgeInsets.symmetric(horizontal: 20),
                   child: Row(
                     children: [
-                      Expanded(child: WgServiceCard.bookRide(onTap: _openSearch)),
+                      Expanded(
+                        child: WgServiceCard.bookRide(onTap: _openSearch),
+                      ),
                       const SizedBox(width: 12),
                       Expanded(
                         child: WgServiceCard.bookFood(
-                          onTap: () => WgToast.info(
-                            context,
-                            'Đặt đồ ăn sẽ ra mắt sớm',
-                          ),
+                          onTap: () =>
+                              WgToast.info(context, 'Đặt đồ ăn sẽ ra mắt sớm'),
                         ),
                       ),
                     ],
@@ -300,8 +296,7 @@ class _MapBanner extends StatelessWidget {
                   color: Colors.transparent,
                   child: InkWell(
                     onTap: onTap,
-                    splashColor:
-                        AppColors.primary500.withValues(alpha: 0.08),
+                    splashColor: AppColors.primary500.withValues(alpha: 0.08),
                   ),
                 ),
               ),

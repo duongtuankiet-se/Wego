@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
@@ -116,7 +117,7 @@ class NavigationInstructionCard extends StatelessWidget {
               Row(
                 children: [
                   const Icon(
-                    Icons.arrow_forward_rounded,
+                    PhosphorIconsRegular.arrowRight,
                     color: AppColors.ink500,
                     size: 14,
                   ),

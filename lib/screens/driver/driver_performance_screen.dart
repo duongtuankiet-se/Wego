@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -28,7 +29,7 @@ class DriverPerformanceScreen extends ConsumerWidget {
       backgroundColor: AppColors.offWhite,
       appBar: AppBar(
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
         ),
         title: const Text('Hiệu suất'),
@@ -157,7 +158,7 @@ class _LevelCard extends StatelessWidget {
                           Row(
                             children: [
                               const Icon(
-                                Icons.star_rounded,
+                                PhosphorIconsFill.star,
                                 color: AppColors.warning,
                                 size: 14,
                               ),
@@ -270,7 +271,7 @@ class _MetricsCard extends StatelessWidget {
             physics: const NeverScrollableScrollPhysics(),
             children: [
               WgMetricTile(
-                icon: Icons.check_circle_outline,
+                icon: PhosphorIconsRegular.checkCircle,
                 value: '${(acceptRate * 100).round()}%',
                 label: 'Tỷ lệ nhận chuyến',
                 iconColor: AppColors.success,
@@ -278,7 +279,7 @@ class _MetricsCard extends StatelessWidget {
                 progressColor: AppColors.success,
               ),
               WgMetricTile(
-                icon: Icons.cancel_outlined,
+                icon: PhosphorIconsRegular.xCircle,
                 value: '${(cancelRate * 100).toStringAsFixed(1)}%',
                 label: 'Tỷ lệ huỷ',
                 iconColor: AppColors.success,
@@ -286,7 +287,7 @@ class _MetricsCard extends StatelessWidget {
                 progressColor: AppColors.success,
               ),
               WgMetricTile(
-                icon: Icons.star_rounded,
+                icon: PhosphorIconsFill.star,
                 value: rating > 0 ? rating.toStringAsFixed(2) : '—',
                 label: 'Đánh giá TB',
                 iconColor: AppColors.warning,
@@ -294,7 +295,7 @@ class _MetricsCard extends StatelessWidget {
                 progressColor: AppColors.warning,
               ),
               WgMetricTile(
-                icon: Icons.directions_car,
+                icon: PhosphorIconsFill.car,
                 value: totalTrips.toString(),
                 label: 'Tổng chuyến',
                 iconColor: AppColors.primary500,

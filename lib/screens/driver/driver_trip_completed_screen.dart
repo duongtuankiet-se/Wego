@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
@@ -60,7 +61,7 @@ class _DriverTripCompletedScreenState
                     shape: BoxShape.circle,
                   ),
                   child: const Icon(
-                    Icons.check_rounded,
+                    PhosphorIconsBold.check,
                     color: AppColors.success,
                     size: 52,
                   ),
@@ -117,7 +118,7 @@ class _DriverTripCompletedScreenState
                 label: 'Về trang chủ',
                 size: WgButtonSize.lg,
                 isFullWidth: true,
-                trailingIcon: Icons.arrow_forward_rounded,
+                trailingIcon: PhosphorIconsRegular.arrowRight,
                 onPressed: () {
                   ref.read(currentTripProvider.notifier).clear();
                   context.go('/driver/home');

@@ -32,10 +32,7 @@ class WgExploreCarousel extends StatelessWidget {
           padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Row(
             children: [
-              Text(
-                '✨ Hôm nay đi đâu nhỉ?',
-                style: AppTypography.h3,
-              ),
+              Text('✨ Hôm nay đi đâu nhỉ?', style: AppTypography.h3),
               const Spacer(),
               if (onViewAll != null)
                 TextButton(
