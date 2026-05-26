@@ -20,55 +20,42 @@ class ExplorePlace {
   });
 }
 
+/// 4 destinations the user can tap from the home carousel. Coords here
+/// flow into `_onExploreTap` in [PassengerHomeScreen] — distances are
+/// rough Đà Nẵng-area numbers used only as label text.
 List<ExplorePlace> generateExplorePlaces() {
   return [
     ExplorePlace(
-      id: 'ep1',
-      name: 'Sân bay Đà Nẵng',
-      tagline: 'Đưa đón giá tốt',
-      distanceKm: 4.2,
-      icon: PhosphorIconsFill.airplane,
-      gradient: const [AppColors.info, Color(0xFF0E7490)],
-    ),
-    ExplorePlace(
-      id: 'ep2',
-      name: 'Vincom Đà Nẵng',
-      tagline: 'Mua sắm cuối tuần',
-      distanceKm: 2.1,
-      icon: PhosphorIconsFill.storefront,
-      gradient: const [Color(0xFFEF4444), Color(0xFFB91C1C)],
-    ),
-    ExplorePlace(
-      id: 'ep3',
-      name: 'Bà Nà Hills',
-      tagline: 'Cầu Vàng huyền thoại',
-      distanceKm: 28.0,
-      icon: PhosphorIconsFill.mountains,
+      id: 'city_danang',
+      name: 'Đà Nẵng',
+      tagline: 'Trung tâm thành phố',
+      distanceKm: 0.5,
+      icon: PhosphorIconsFill.city,
       gradient: const [AppColors.primary500, AppColors.primary700],
     ),
     ExplorePlace(
-      id: 'ep4',
-      name: 'Cầu Rồng',
-      tagline: 'Biểu tượng thành phố',
-      distanceKm: 1.4,
-      icon: PhosphorIconsFill.buildings,
-      gradient: const [Color(0xFF8B5CF6), Color(0xFF6D28D9)],
+      id: 'city_hoian',
+      name: 'Hội An',
+      tagline: 'Phố cổ',
+      distanceKm: 30.2,
+      icon: PhosphorIconsFill.castleTurret,
+      gradient: const [Color(0xFFFBBF24), Color(0xFFF59E0B)],
     ),
     ExplorePlace(
-      id: 'ep5',
-      name: 'Biển Mỹ Khê',
-      tagline: 'Top 6 biển đẹp châu Á',
-      distanceKm: 3.6,
-      icon: PhosphorIconsFill.umbrella,
+      id: 'city_banahills',
+      name: 'Bà Nà Hills',
+      tagline: 'Cầu Vàng',
+      distanceKm: 36.0,
+      icon: PhosphorIconsFill.mountains,
+      gradient: const [Color(0xFF8B5CF6), Color(0xFF7C3AED)],
+    ),
+    ExplorePlace(
+      id: 'city_mykhe',
+      name: 'Mỹ Khê',
+      tagline: 'Biển',
+      distanceKm: 5.0,
+      icon: PhosphorIconsFill.umbrellaSimple,
       gradient: const [Color(0xFF06B6D4), Color(0xFF0891B2)],
-    ),
-    ExplorePlace(
-      id: 'ep6',
-      name: 'Chợ Hàn',
-      tagline: 'Ẩm thực địa phương',
-      distanceKm: 1.8,
-      icon: PhosphorIconsFill.shoppingBag,
-      gradient: const [Color(0xFFF59E0B), Color(0xFFB45309)],
     ),
   ];
 }

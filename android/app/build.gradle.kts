@@ -3,8 +3,12 @@ import java.io.FileInputStream
 
 plugins {
     id("com.android.application")
+    id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Firebase Phone Auth: reads google-services.json and injects Firebase
+    // config into the manifest.
+    id("com.google.gms.google-services")
 }
 
 // Load secrets from android/local.properties (gitignored).
@@ -33,11 +37,14 @@ android {
         applicationId = "com.example.exe"
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
-        // Google Maps SDK Android requires minSdk >= 21.
-        minSdk = maxOf(flutter.minSdkVersion, 21)
+        // Firebase Auth requires minSdk >= 23 (Google Maps SDK only needed 21).
+        minSdk = maxOf(flutter.minSdkVersion, 23)
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
+
+        // 65k method limit guard — Firebase + Google Maps push us over.
+        multiDexEnabled = true
 
         // Injected into AndroidManifest <meta-data android:name="com.google.android.geo.API_KEY" .../>
         manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
@@ -60,4 +67,8 @@ kotlin {
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    implementation("androidx.multidex:multidex:2.0.1")
 }

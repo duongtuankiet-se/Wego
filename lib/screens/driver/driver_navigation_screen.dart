@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
+import '../../core/utils/geohash_util.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
@@ -45,9 +46,13 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   bool _navigated = false;
   bool _muted = false;
 
-  /// Real-route polyline for the active leg (driver→pickup or
-  /// pickup→dropoff). Refreshed each phase transition.
-  List<LatLng>? _routePoints;
+  /// Real-route data for the active leg (driver→pickup or
+  /// pickup→dropoff). Refreshed each phase transition. Contains both
+  /// polyline points and turn-by-turn steps.
+  DirectionsRoute? _route;
+  int _currentStepIndex = 0;
+
+  List<LatLng>? get _routePoints => _route?.points;
 
   @override
   void initState() {
@@ -104,12 +109,52 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
 
   void _tickCar() {
     final t = _carAnim.value;
-    setState(() {
-      _carPos = LatLng(
+    final points = _routePoints;
+
+    LatLng newPos;
+    if (points == null || points.length < 2) {
+      newPos = LatLng(
         _legStart.latitude + (_legEnd.latitude - _legStart.latitude) * t,
         _legStart.longitude + (_legEnd.longitude - _legStart.longitude) * t,
       );
-    });
+    } else {
+      final n = points.length - 1;
+      final scaled = (t * n).clamp(0.0, n.toDouble());
+      final i = scaled.floor().clamp(0, n - 1);
+      final segT = scaled - i;
+      final a = points[i];
+      final b = points[i + 1];
+      newPos = LatLng(
+        a.latitude + (b.latitude - a.latitude) * segT,
+        a.longitude + (b.longitude - a.longitude) * segT,
+      );
+    }
+
+    setState(() => _carPos = newPos);
+    _advanceStepIfClose(newPos);
+  }
+
+  /// Advance to the next maneuver when the car gets within 50m of the
+  /// current step's endpoint. Triggers a haptic so the driver feels the
+  /// instruction flip.
+  void _advanceStepIfClose(LatLng carPos) {
+    final steps = _route?.steps;
+    if (steps == null || steps.isEmpty) return;
+    if (_currentStepIndex >= steps.length - 1) return;
+    final endLat = steps[_currentStepIndex].end.latitude;
+    final endLng = steps[_currentStepIndex].end.longitude;
+    final distMeters =
+        GeohashUtil.distanceKm(
+          carPos.latitude,
+          carPos.longitude,
+          endLat,
+          endLng,
+        ) *
+        1000;
+    if (distMeters < 50) {
+      setState(() => _currentStepIndex++);
+      HapticFeedback.lightImpact();
+    }
   }
 
   void _onArrived() {
@@ -134,7 +179,8 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
       _legStart = LatLng(trip.trip.pickupLat, trip.trip.pickupLng);
       _legEnd = LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
       _carPos = _legStart;
-      _routePoints = null; // recompute for the new leg
+      _route = null;
+      _currentStepIndex = 0;
     });
     _refreshRoute();
     _fitBounds(_legStart, _legEnd);
@@ -184,10 +230,113 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
       origin: start,
       destination: end,
     );
-    if (mounted && route != null) {
-      setState(() => _routePoints = route.points);
-    } else if (mounted) {
-      setState(() => _routePoints = null);
+    if (!mounted) return;
+    setState(() {
+      _route = route;
+      _currentStepIndex = 0;
+    });
+  }
+
+  /// Either the live Google step at [_currentStepIndex] or the cyclic
+  /// mock when directions hasn't loaded yet.
+  TurnInstruction _liveInstruction() {
+    final steps = _route?.steps;
+    if (steps != null && steps.isNotEmpty) {
+      final step = steps[_currentStepIndex.clamp(0, steps.length - 1)];
+      final nextStep = (_currentStepIndex + 1 < steps.length)
+          ? steps[_currentStepIndex + 1]
+          : null;
+      return _stepToInstruction(step, nextStep);
+    }
+    return kTurnInstructions[_instructionIdx];
+  }
+
+  /// Convert a Google [DirectionsStep] into the shape our UI card expects.
+  /// Splits the instruction text into a short verb ("Rẽ phải vào") + the
+  /// rest ("Trần Phú") when there's a recognisable comma/space split,
+  /// otherwise dumps everything into [streetName].
+  TurnInstruction _stepToInstruction(
+    DirectionsStep step,
+    DirectionsStep? next,
+  ) {
+    final text = step.instruction.trim();
+    String action;
+    String street;
+    final commaIdx = text.indexOf(' vào ');
+    if (commaIdx > 0 && commaIdx < text.length - 5) {
+      action = text.substring(0, commaIdx + 4); // include "vào"
+      street = text.substring(commaIdx + 5).trim();
+    } else {
+      action = _maneuverLabel(step.maneuver);
+      street = text;
+    }
+    return TurnInstruction(
+      icon: _maneuverIcon(step.maneuver),
+      action: action,
+      streetName: street,
+      distanceMeters: step.distanceMeters,
+      nextHint: next?.instruction,
+    );
+  }
+
+  IconData _maneuverIcon(String? maneuver) {
+    switch (maneuver) {
+      case 'turn-right':
+      case 'turn-slight-right':
+        return PhosphorIconsRegular.arrowBendUpRight;
+      case 'turn-left':
+      case 'turn-slight-left':
+        return PhosphorIconsRegular.arrowBendUpLeft;
+      case 'turn-sharp-right':
+        return PhosphorIconsRegular.arrowUUpRight;
+      case 'turn-sharp-left':
+        return PhosphorIconsRegular.arrowUUpLeft;
+      case 'uturn-right':
+      case 'uturn-left':
+        return PhosphorIconsRegular.arrowUUpLeft;
+      case 'ramp-right':
+      case 'ramp-left':
+      case 'fork-right':
+      case 'fork-left':
+        return PhosphorIconsRegular.arrowsSplit;
+      case 'merge':
+        return PhosphorIconsRegular.arrowsMerge;
+      case 'roundabout-right':
+        return PhosphorIconsRegular.arrowsClockwise;
+      case 'roundabout-left':
+        return PhosphorIconsRegular.arrowsCounterClockwise;
+      case 'straight':
+      default:
+        return PhosphorIconsRegular.arrowUp;
+    }
+  }
+
+  String _maneuverLabel(String? maneuver) {
+    switch (maneuver) {
+      case 'turn-right':
+      case 'turn-slight-right':
+        return 'Rẽ phải';
+      case 'turn-left':
+      case 'turn-slight-left':
+        return 'Rẽ trái';
+      case 'turn-sharp-right':
+        return 'Rẽ gấp phải';
+      case 'turn-sharp-left':
+        return 'Rẽ gấp trái';
+      case 'uturn-right':
+      case 'uturn-left':
+        return 'Quay đầu';
+      case 'merge':
+        return 'Nhập làn';
+      case 'roundabout-right':
+      case 'roundabout-left':
+        return 'Vào bùng binh';
+      case 'fork-right':
+      case 'fork-left':
+        return 'Tách làn';
+      case 'straight':
+      default:
+        return 'Tiếp tục';
     }
   }
 
@@ -276,9 +425,7 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
             top: mq.padding.top + 12,
             left: 16,
             right: 16,
-            child: NavigationInstructionCard(
-              instruction: kTurnInstructions[_instructionIdx],
-            ),
+            child: NavigationInstructionCard(instruction: _liveInstruction()),
           ),
           // Speed limit badge
           Positioned(

@@ -51,6 +51,10 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   /// Null until the API call returns; UI falls back to a straight line.
   List<LatLng>? _routePoints;
 
+  /// Driver → pickup route polyline (for the "approaching" phase).
+  /// Fetched lazily so we can animate the car along real roads too.
+  List<LatLng>? _approachPoints;
+
   @override
   void initState() {
     super.initState();
@@ -91,21 +95,61 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   Future<void> _fetchRoute() async {
     final trip = ref.read(currentTripProvider);
     if (trip == null) return;
-    final route = await DirectionsService.getRoute(
-      origin: LatLng(trip.trip.pickupLat, trip.trip.pickupLng),
-      destination: LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng),
-    );
-    if (mounted && route != null) {
-      setState(() => _routePoints = route.points);
+    // Kick off both legs in parallel so the car always has a real path
+    // to walk by the time each phase starts.
+    final results = await Future.wait([
+      DirectionsService.getRoute(
+        origin: LatLng(trip.driver.currentLat, trip.driver.currentLng),
+        destination: LatLng(trip.trip.pickupLat, trip.trip.pickupLng),
+      ),
+      DirectionsService.getRoute(
+        origin: LatLng(trip.trip.pickupLat, trip.trip.pickupLng),
+        destination: LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng),
+      ),
+    ]);
+    if (!mounted) return;
+    setState(() {
+      _approachPoints = results[0]?.points;
+      _routePoints = results[1]?.points;
+    });
+  }
+
+  /// Active polyline for the current leg, or null to fall back to linear
+  /// interpolation between [_legStart] and [_legEnd].
+  List<LatLng>? get _activePoints {
+    switch (_phase) {
+      case _LivePhase.driverArriving:
+        return _approachPoints;
+      case _LivePhase.inTransit:
+        return _routePoints;
+      case _LivePhase.driverArrived:
+        return null;
     }
   }
 
   void _updateCar() {
     final t = _carAnim.value;
-    final lat =
-        _legStart.latitude + (_legEnd.latitude - _legStart.latitude) * t;
-    final lng =
-        _legStart.longitude + (_legEnd.longitude - _legStart.longitude) * t;
+    final points = _activePoints;
+
+    if (points == null || points.length < 2) {
+      final lat =
+          _legStart.latitude + (_legEnd.latitude - _legStart.latitude) * t;
+      final lng =
+          _legStart.longitude + (_legEnd.longitude - _legStart.longitude) * t;
+      setState(() => _carPos = LatLng(lat, lng));
+      return;
+    }
+
+    // Walk the polyline: spread `t` across N-1 segments, interpolate the
+    // active one. Result is a smooth-ish path along real roads.
+    final n = points.length - 1;
+    final scaled = (t * n).clamp(0.0, n.toDouble());
+    final i = scaled.floor().clamp(0, n - 1);
+    final segT = scaled - i;
+    final a = points[i];
+    final b = points[i + 1];
+    final lat = a.latitude + (b.latitude - a.latitude) * segT;
+    final lng = a.longitude + (b.longitude - a.longitude) * segT;
     setState(() => _carPos = LatLng(lat, lng));
   }
 

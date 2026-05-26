@@ -53,19 +53,19 @@ class RoleSelectScreen extends StatelessWidget {
                 icon: PhosphorIconsFill.user,
                 title: 'Tôi là khách hàng',
                 subtitle: 'Đặt xe nhanh, đi ghép tiết kiệm',
-                onTap: () => context.push('/login?role=passenger'),
+                onTap: () => context.push('/register?role=passenger'),
               ),
               const SizedBox(height: AppSpacing.lg),
               _RoleCard(
                 icon: PhosphorIconsFill.car,
                 title: 'Tôi là tài xế',
                 subtitle: 'Nhận chuyến, tăng thu nhập',
-                onTap: () => context.push('/login?role=driver'),
+                onTap: () => context.push('/register?role=driver'),
               ),
               const Spacer(),
               Center(
                 child: TextButton(
-                  onPressed: () => context.push('/login?role=passenger'),
+                  onPressed: () => context.push('/login'),
                   child: Text(
                     'Đã có tài khoản? Đăng nhập',
                     style: AppTypography.body.copyWith(

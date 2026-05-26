@@ -15,6 +15,7 @@ import '../../models/trip.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/selected_destination_provider.dart';
 import '../../providers/selected_ride_type_provider.dart';
+import '../../services/directions_service.dart';
 import '_widgets/ride_type_card.dart';
 import '_widgets/route_preview_map.dart';
 import '_widgets/route_summary_card.dart';
@@ -23,7 +24,7 @@ import '_widgets/route_summary_card.dart';
 const _kOpenFare = 8000; // VND base fare (cửa)
 const _kPerKm = 12000; // VND per km
 const _kPromoDiscount = 20000; // WEGO50 fixed discount
-const double _kAvgSpeedKmh = 25; // for ETA estimation
+const double _kAvgSpeedKmh = 25; // for ETA fallback when API fails
 const double _kShareDiscount = 0.62; // 38% off vs private
 const double _kSevenSeatMultiplier = 1.45;
 
@@ -40,6 +41,39 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
   /// Stand-in pickup address until reverse-geocoding lands.
   static const _pickupAddress = 'Vị trí hiện tại';
 
+  DirectionsRoute? _route;
+  bool _loadingRoute = true;
+  bool _routeFailed = false;
+  LatLng? _lastFetchKey;
+
+  Future<void> _maybeFetchRoute(LatLng pickup, LatLng dropoff) async {
+    // Avoid re-firing on every rebuild — key by destination since the
+    // user's GPS pickup only nudges by a few meters between frames.
+    final key = LatLng(
+      ((dropoff.latitude + pickup.latitude) * 1e4).roundToDouble(),
+      ((dropoff.longitude + pickup.longitude) * 1e4).roundToDouble(),
+    );
+    if (_lastFetchKey == key) return;
+    _lastFetchKey = key;
+
+    setState(() {
+      _loadingRoute = true;
+      _routeFailed = false;
+    });
+
+    final result = await DirectionsService.getRoute(
+      origin: pickup,
+      destination: dropoff,
+    );
+
+    if (!mounted) return;
+    setState(() {
+      _route = result;
+      _loadingRoute = false;
+      _routeFailed = result == null;
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     final dropoff = ref.watch(selectedDestinationProvider);
@@ -54,13 +88,26 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     final pickup = LatLng(origin.latitude, origin.longitude);
     final dest = LatLng(dropoff.lat, dropoff.lng);
 
-    final distanceKm = GeohashUtil.distanceKm(
-      pickup.latitude,
-      pickup.longitude,
-      dest.latitude,
-      dest.longitude,
-    );
-    final durationMin = (distanceKm / _kAvgSpeedKmh * 60).round().clamp(1, 240);
+    // Kick off the directions fetch once the first frame is laid out so
+    // the loading spinner shows immediately instead of after a sync gap.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _maybeFetchRoute(pickup, dest);
+    });
+
+    // Prefer Directions API result, fall back to Haversine + speed mock
+    // so the price/CTA still works offline.
+    final distanceKm =
+        _route?.distanceKm ??
+        GeohashUtil.distanceKm(
+          pickup.latitude,
+          pickup.longitude,
+          dest.latitude,
+          dest.longitude,
+        );
+    final durationMin =
+        _route?.durationMin ??
+        (distanceKm / _kAvgSpeedKmh * 60).round().clamp(1, 240);
+
     final baseFare = _roundToThousand(distanceKm * _kPerKm + _kOpenFare);
     final sharedFare = _roundToThousand(baseFare * _kShareDiscount);
     final sevenSeatFare = _roundToThousand(baseFare * _kSevenSeatMultiplier);
@@ -100,7 +147,29 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
         child: ListView(
           padding: const EdgeInsets.only(bottom: 16),
           children: [
-            RoutePreviewMap(pickup: pickup, dropoff: dest, height: 200),
+            Stack(
+              children: [
+                RoutePreviewMap(
+                  pickup: pickup,
+                  dropoff: dest,
+                  routePoints: _route?.points,
+                  height: 200,
+                ),
+                if (_loadingRoute)
+                  const Positioned(
+                    top: 12,
+                    right: 12,
+                    child: _RouteLoadingPill(),
+                  ),
+                if (_routeFailed && !_loadingRoute)
+                  const Positioned(
+                    top: 12,
+                    left: 12,
+                    right: 12,
+                    child: _RouteFallbackBanner(),
+                  ),
+              ],
+            ),
             ColoredBox(
               color: AppColors.white,
               child: RouteSummaryCard(
@@ -210,6 +279,90 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
       'durationMin': durationMin,
     };
     context.push('/passenger/matching', extra: extra);
+  }
+}
+
+class _RouteLoadingPill extends StatelessWidget {
+  const _RouteLoadingPill();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(999),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink900.withValues(alpha: 0.08),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(
+            width: 12,
+            height: 12,
+            child: CircularProgressIndicator(
+              strokeWidth: 1.5,
+              valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary500),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            'Đang tìm tuyến đường…',
+            style: AppTypography.caption.copyWith(color: AppColors.ink700),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _RouteFallbackBanner extends StatelessWidget {
+  const _RouteFallbackBanner();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: AppColors.warning.withValues(alpha: 0.95),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink900.withValues(alpha: 0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(
+            PhosphorIconsFill.warning,
+            color: AppColors.white,
+            size: 16,
+          ),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'Không tải được tuyến đường — đang dùng ước tính',
+              style: AppTypography.caption.copyWith(
+                color: AppColors.white,
+                fontWeight: FontWeight.w600,
+              ),
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

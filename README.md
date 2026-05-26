@@ -221,6 +221,6 @@ ratings:  { _id, trip_id, rater_id, ratee_id, stars, tags: [String],
 
 Đồ án môn học — không thương mại hoá.
 
-Sinh viên: **Lê Cầu Nguyễn**  
-Email: `tuanyen1409@gmail.com`  
+Sinh viên: **Cầu Nguyễn**  
+Email: `caunguyen.221@gmail.com`  
 GitHub: [@volamdp95](https://github.com/volamdp95)

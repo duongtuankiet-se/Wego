@@ -5,16 +5,17 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
+import '../../core/utils/format.dart';
 import '../../core/utils/validators.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_input.dart';
 import '../../core/widgets/wg_toast.dart';
-import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 
+/// Phone-only login (Phase 5D). For accounts already in Mongo, name +
+/// role come from the stored doc — we only re-verify the phone via OTP.
 class LoginScreen extends ConsumerStatefulWidget {
-  const LoginScreen({super.key, required this.role});
-  final UserRole role;
+  const LoginScreen({super.key});
 
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
@@ -22,13 +23,11 @@ class LoginScreen extends ConsumerStatefulWidget {
 
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-  final _nameCtrl = TextEditingController();
   final _phoneCtrl = TextEditingController();
   bool _loading = false;
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
     _phoneCtrl.dispose();
     super.dispose();
   }
@@ -37,37 +36,30 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _loading = true);
 
-    try {
-      await ref
-          .read(authStateProvider.notifier)
-          .login(
-            name: _nameCtrl.text,
-            phone: _phoneCtrl.text,
-            role: widget.role,
-          );
-      final auth = ref.read(authStateProvider);
-      if (auth.hasError) throw auth.error!;
-      if (!mounted) return;
-      WgToast.success(context, 'Đăng nhập thành công');
-      if (widget.role == UserRole.driver) {
-        context.go('/driver/home');
-      } else {
-        context.go('/passenger/home');
-      }
-    } catch (e) {
-      if (!mounted) return;
-      final msg = e.toString().replaceFirst('Exception: ', '');
-      WgToast.error(context, 'Lỗi: $msg');
-    } finally {
-      if (mounted) setState(() => _loading = false);
+    final phoneE164 = normalizePhone(_phoneCtrl.text);
+    final error = await ref.read(authStateProvider.notifier).sendOtp(phoneE164);
+
+    if (!mounted) return;
+    setState(() => _loading = false);
+
+    if (error != null) {
+      WgToast.error(context, error);
+      return;
     }
+
+    context.push(
+      '/verify-otp',
+      extra: <String, Object>{'phone': phoneE164, 'isRegister': false},
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    final roleLabel = widget.role == UserRole.driver ? 'tài xế' : 'khách hàng';
     return Scaffold(
+      backgroundColor: AppColors.white,
       appBar: AppBar(
+        backgroundColor: AppColors.white,
+        elevation: 0,
         leading: IconButton(
           icon: const Icon(PhosphorIconsRegular.arrowLeft),
           onPressed: () => context.pop(),
@@ -79,33 +71,19 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: Form(
             key: _formKey,
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            child: ListView(
               children: [
                 const SizedBox(height: 8),
                 Text(
-                  'Nhập thông tin để bắt đầu',
+                  'Chào mừng trở lại',
+                  style: AppTypography.h1.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Nhập số điện thoại để nhận mã OTP',
                   style: AppTypography.body.copyWith(color: AppColors.ink500),
                 ),
-                const SizedBox(height: 4),
-                Text(
-                  'Bạn đang đăng nhập với vai trò $roleLabel',
-                  style: AppTypography.caption.copyWith(
-                    color: AppColors.primary700,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
                 const SizedBox(height: 28),
-                WgInput(
-                  label: 'Họ và tên',
-                  hint: 'Nguyễn Văn A',
-                  controller: _nameCtrl,
-                  prefixIcon: PhosphorIconsRegular.userCircle,
-                  validator: Validators.validateName,
-                  textInputAction: TextInputAction.next,
-                  enabled: !_loading,
-                ),
-                const SizedBox(height: 16),
                 WgInput(
                   label: 'Số điện thoại',
                   hint: '0905xxxxxx',
@@ -117,7 +95,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   enabled: !_loading,
                   onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: 32),
+                const SizedBox(height: 28),
                 WgButton.primary(
                   label: 'Tiếp tục',
                   size: WgButtonSize.lg,
@@ -125,14 +103,26 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   isLoading: _loading,
                   onPressed: _loading ? null : _submit,
                 ),
-                const Spacer(),
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  child: Text(
-                    'Bằng việc tiếp tục, bạn đồng ý với Điều khoản & Chính sách bảo mật của WeGo',
-                    textAlign: TextAlign.center,
-                    style: AppTypography.caption.copyWith(
-                      color: AppColors.ink500,
+                const SizedBox(height: 16),
+                Center(
+                  child: TextButton(
+                    onPressed: _loading ? null : () => context.go('/register'),
+                    child: RichText(
+                      text: TextSpan(
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.ink500,
+                        ),
+                        children: [
+                          const TextSpan(text: 'Chưa có tài khoản? '),
+                          TextSpan(
+                            text: 'Đăng ký',
+                            style: AppTypography.body.copyWith(
+                              color: AppColors.primary500,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
                 ),
