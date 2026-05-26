@@ -14,6 +14,7 @@ import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
+import '_widgets/auth_header.dart';
 
 class VerifyOtpScreen extends ConsumerStatefulWidget {
   const VerifyOtpScreen({
@@ -125,14 +126,15 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
   }
 
   String _maskedPhone() {
-    // Show "+84 9** *** 456" — middle 5 digits become * to confirm they
-    // typed it correctly without exposing the full number.
+    // Show "+84 905 *** 456" — the user just typed it, so the 3-digit
+    // carrier prefix is fine to confirm visually while masking the
+    // middle subscriber digits.
     final p = widget.phone;
     if (p.length < 9) return p;
     final country = p.substring(0, 3);
-    final firstDigit = p.substring(3, 4);
+    final prefix3 = p.substring(3, 6);
     final last3 = p.substring(p.length - 3);
-    return '$country $firstDigit** *** $last3';
+    return '$country $prefix3 *** $last3';
   }
 
   @override
@@ -155,25 +157,22 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
           padding: const EdgeInsets.symmetric(horizontal: 20),
           child: ListView(
             children: [
-              const SizedBox(height: 8),
-              Text(
-                'Nhập mã OTP',
-                style: AppTypography.h1.copyWith(fontWeight: FontWeight.w800),
-              ),
-              const SizedBox(height: 6),
-              RichText(
-                text: TextSpan(
-                  style: AppTypography.body.copyWith(color: AppColors.ink500),
-                  children: [
-                    const TextSpan(text: 'Mã đã gửi đến '),
-                    TextSpan(
-                      text: _maskedPhone(),
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.ink900,
-                        fontWeight: FontWeight.w700,
+              WgAuthHeader(
+                title: 'Nhập mã OTP',
+                subtitle: RichText(
+                  text: TextSpan(
+                    style: AppTypography.body.copyWith(color: AppColors.ink500),
+                    children: [
+                      const TextSpan(text: 'Mã đã gửi đến '),
+                      TextSpan(
+                        text: _maskedPhone(),
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.ink900,
+                          fontWeight: FontWeight.w700,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ),
               const SizedBox(height: 28),

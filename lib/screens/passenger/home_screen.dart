@@ -19,6 +19,7 @@ import '../../data/mock_quick_services.dart';
 import '../../models/place.dart';
 import '../../models/trip.dart';
 import '../../providers/auth_provider.dart';
+import '../../providers/custom_pickup_provider.dart';
 import '../../providers/selected_destination_provider.dart';
 import '../../providers/selected_ride_type_provider.dart';
 
@@ -68,39 +69,28 @@ class PassengerHomeScreen extends ConsumerWidget {
       case QuickServiceAction.comingSoon:
         WgToast.info(context, '${svc.label} sẽ ra mắt sớm');
       case QuickServiceAction.pickCustomPickup:
-        final picked = await context.push<Place>('/passenger/map-picker');
+        // "Đi đón khách": let the user pin a friend's location on the
+        // map → treat that as the trip's pickup (overriding GPS) → drop
+        // them into Search to choose the dropoff.
+        final picked = await context.push<Place>(
+          '/passenger/map-picker?mode=pickup',
+        );
         if (picked == null || !context.mounted) return;
-        _quickPickPlace(context, ref, picked);
+        ref.read(customPickupProvider.notifier).set(picked);
+        WgToast.success(context, 'Đã chọn điểm đón: ${picked.name}');
+        await _openSearch(context);
     }
   }
 
-  /// City coords keyed by explore id. Bypasses [kDanangPlaces] lookup so
-  /// each carousel card always drops the user at the right intersection
-  /// (and the Directions API gets a real road snap point).
-  static const Map<String, (double, double, String)> _cityTargets = {
-    'city_danang': (16.0544, 108.2022, 'Trung tâm Đà Nẵng'),
-    'city_hoian': (15.8801, 108.3380, 'Phố cổ Hội An'),
-    'city_banahills': (15.9978, 107.9881, 'Bà Nà Hills'),
-    'city_mykhe': (16.0742, 108.2470, 'Biển Mỹ Khê'),
-  };
-
-  void _onExploreTap(BuildContext context, WidgetRef ref, ExplorePlace ep) {
-    final target = _cityTargets[ep.id];
-    final place = target == null
-        ? Place(
-            id: ep.id,
-            name: ep.name,
-            address: ep.tagline,
-            lat: 16.0544 + (ep.distanceKm * 0.001),
-            lng: 108.2022,
-          )
-        : Place(
-            id: ep.id,
-            name: ep.name,
-            address: target.$3,
-            lat: target.$1,
-            lng: target.$2,
-          );
+  void _onExploreTap(BuildContext context, WidgetRef ref, CityExplore city) {
+    final place = Place(
+      id: city.id,
+      name: city.name,
+      address: city.tagline,
+      lat: city.lat,
+      lng: city.lng,
+      icon: 'mapPin',
+    );
     _quickPickPlace(context, ref, place);
   }
 
@@ -168,7 +158,7 @@ class PassengerHomeScreen extends ConsumerWidget {
                 child: Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
                   child: WgExploreCarousel(
-                    places: generateExplorePlaces(),
+                    places: kCityExplorePlaces,
                     onPlaceTap: (ep) => _onExploreTap(context, ref, ep),
                     onViewAll: () => _openSearch(context),
                   ),

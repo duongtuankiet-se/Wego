@@ -217,8 +217,15 @@ GoRouter router(Ref ref) {
       GoRoute(
         parentNavigatorKey: _rootKey,
         path: '/passenger/map-picker',
-        pageBuilder: (context, state) =>
-            _slideUpPage(state: state, child: const MapPickerScreen()),
+        pageBuilder: (context, state) {
+          final mode = state.uri.queryParameters['mode'] == 'pickup'
+              ? MapPickerMode.pickup
+              : MapPickerMode.dropoff;
+          return _slideUpPage(
+            state: state,
+            child: MapPickerScreen(mode: mode),
+          );
+        },
       ),
       GoRoute(
         parentNavigatorKey: _rootKey,

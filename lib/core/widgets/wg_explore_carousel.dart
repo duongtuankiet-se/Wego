@@ -19,8 +19,8 @@ class WgExploreCarousel extends StatelessWidget {
     this.onViewAll,
   });
 
-  final List<ExplorePlace> places;
-  final ValueChanged<ExplorePlace> onPlaceTap;
+  final List<CityExplore> places;
+  final ValueChanged<CityExplore> onPlaceTap;
   final VoidCallback? onViewAll;
 
   @override
@@ -89,7 +89,7 @@ class WgExploreCarousel extends StatelessWidget {
 
 class _ExploreCard extends StatelessWidget {
   const _ExploreCard({required this.place, required this.onTap});
-  final ExplorePlace place;
+  final CityExplore place;
   final VoidCallback onTap;
 
   @override

@@ -11,6 +11,7 @@ import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_input.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../providers/auth_provider.dart';
+import '_widgets/auth_header.dart';
 
 /// Phone-only login (Phase 5D). For accounts already in Mongo, name +
 /// role come from the stored doc — we only re-verify the phone via OTP.
@@ -73,15 +74,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             key: _formKey,
             child: ListView(
               children: [
-                const SizedBox(height: 8),
-                Text(
-                  'Chào mừng trở lại',
-                  style: AppTypography.h1.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  'Nhập số điện thoại để nhận mã OTP',
-                  style: AppTypography.body.copyWith(color: AppColors.ink500),
+                WgAuthHeader.text(
+                  title: 'Chào mừng trở lại',
+                  subtitle: 'Nhập số điện thoại để nhận mã OTP',
                 ),
                 const SizedBox(height: 28),
                 WgInput(
