@@ -7,7 +7,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_radius.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_typography.dart';
-import '../../core/utils/format.dart';
+import '../../core/utils/string_utils.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_list_tile.dart';
@@ -44,10 +44,8 @@ class PassengerProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).valueOrNull;
-    final phone = user == null ? '—' : formatPhone(user.phone);
-    final maskedPhone = phone.length > 6
-        ? '${phone.substring(0, 4)} *** ${phone.substring(phone.length - 3)}'
-        : phone;
+    final maskedPhone = user == null ? '—' : formatPhoneMask(user.phone);
+    final displayName = user == null ? 'Khách' : toProperCase(user.name);
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -63,7 +61,7 @@ class PassengerProfileScreen extends ConsumerWidget {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
-          _UserCard(name: user?.name ?? 'Khách', maskedPhone: maskedPhone),
+          _UserCard(name: displayName, maskedPhone: maskedPhone),
           const SizedBox(height: 20),
           _SectionTitle('Tài khoản'),
           _SettingsGroup(

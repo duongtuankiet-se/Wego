@@ -13,6 +13,7 @@ import '../../core/utils/format.dart';
 import '../../core/widgets/wg_badge.dart';
 import '../../core/widgets/wg_empty_state.dart';
 import '../../core/widgets/wg_error_state.dart';
+import '../../core/widgets/wg_status_badge.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/mongo_provider.dart';
 
@@ -316,11 +317,15 @@ class _TripCard extends StatelessWidget {
           const SizedBox(height: 10),
           Row(
             children: [
-              Text(
-                isCompleted
-                    ? 'Đã hoàn thành'
-                    : (isCancelled ? 'Đã huỷ' : 'Đang xử lý'),
-                style: AppTypography.caption.copyWith(color: AppColors.ink500),
+              WgStatusBadge(
+                label: isCompleted
+                    ? 'Hoàn thành'
+                    : (isCancelled ? 'Đã hủy' : 'Đang xử lý'),
+                tone: isCompleted
+                    ? WgStatusTone.success
+                    : (isCancelled
+                          ? WgStatusTone.danger
+                          : WgStatusTone.warning),
               ),
               const Spacer(),
               Text(

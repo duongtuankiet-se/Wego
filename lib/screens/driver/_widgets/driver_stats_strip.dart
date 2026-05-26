@@ -23,48 +23,69 @@ class DriverStatsStrip extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
       decoration: BoxDecoration(
         color: AppColors.white.withValues(alpha: 0.96),
         borderRadius: BorderRadius.circular(20),
         boxShadow: [
           BoxShadow(
-            color: AppColors.ink900.withValues(alpha: 0.1),
-            blurRadius: 18,
-            offset: const Offset(0, 6),
+            color: AppColors.ink900.withValues(alpha: 0.08),
+            blurRadius: 16,
+            offset: const Offset(0, 4),
           ),
         ],
       ),
-      child: Row(
-        children: [
-          _cell(
-            PhosphorIconsRegular.currencyDollar,
-            AppColors.success,
-            earningsLabel,
-            'Thu nhập',
-          ),
-          const _Divider(),
-          _cell(
-            PhosphorIconsFill.car,
-            AppColors.primary500,
-            '$tripCount',
-            'Chuyến',
-          ),
-          const _Divider(),
-          _cell(
-            PhosphorIconsRegular.clock,
-            AppColors.warning,
-            activeLabel,
-            'Hoạt động',
-          ),
-          const _Divider(),
-          _cell(
-            PhosphorIconsFill.star,
-            AppColors.warning,
-            rating > 0 ? rating.toStringAsFixed(2) : '—',
-            'Đánh giá',
-          ),
-        ],
+      child: IntrinsicHeight(
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            _cell(
+              PhosphorIconsRegular.currencyDollar,
+              AppColors.success,
+              earningsLabel,
+              'Thu nhập',
+            ),
+            const VerticalDivider(
+              width: 1,
+              thickness: 0.5,
+              color: AppColors.ink200,
+              indent: 4,
+              endIndent: 4,
+            ),
+            _cell(
+              PhosphorIconsFill.car,
+              AppColors.primary500,
+              '$tripCount',
+              'Chuyến',
+            ),
+            const VerticalDivider(
+              width: 1,
+              thickness: 0.5,
+              color: AppColors.ink200,
+              indent: 4,
+              endIndent: 4,
+            ),
+            _cell(
+              PhosphorIconsRegular.clock,
+              AppColors.warning,
+              activeLabel,
+              'Hoạt động',
+            ),
+            const VerticalDivider(
+              width: 1,
+              thickness: 0.5,
+              color: AppColors.ink200,
+              indent: 4,
+              endIndent: 4,
+            ),
+            _cell(
+              PhosphorIconsFill.star,
+              AppColors.warning,
+              rating > 0 ? rating.toStringAsFixed(2) : '—',
+              'Đánh giá',
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -81,13 +102,14 @@ class DriverStatsStrip extends StatelessWidget {
             style: AppTypography.body.copyWith(
               color: AppColors.ink900,
               fontWeight: FontWeight.w700,
-              fontSize: 15,
+              fontSize: 14,
               fontFamily: 'monospace',
               fontFeatures: const [FontFeature.tabularFigures()],
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
+          const SizedBox(height: 2),
           Text(
             label,
             style: AppTypography.micro.copyWith(color: AppColors.ink500),
@@ -97,13 +119,5 @@ class DriverStatsStrip extends StatelessWidget {
         ],
       ),
     );
-  }
-}
-
-class _Divider extends StatelessWidget {
-  const _Divider();
-  @override
-  Widget build(BuildContext context) {
-    return Container(width: 0.5, height: 40, color: AppColors.ink300);
   }
 }

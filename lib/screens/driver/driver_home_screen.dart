@@ -1,12 +1,13 @@
 import 'dart:async';
 
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
-import 'package:sliding_up_panel/sliding_up_panel.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
+import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
@@ -15,7 +16,6 @@ import '../../core/utils/format.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_glass.dart';
 import '../../core/widgets/wg_incentive_card.dart';
-import '../../core/widgets/wg_status_toggle.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_hotspots.dart';
 import '../../models/driver.dart';
@@ -28,7 +28,6 @@ import '../../providers/incoming_trip_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/trip_service_provider.dart';
 import '_widgets/driver_stats_strip.dart';
-import '_widgets/hotspot_card.dart';
 import '_widgets/incoming_trip_modal.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
@@ -61,8 +60,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     _modalOpen = false;
     if (!mounted) return;
     if (!accepted) {
-      // Driver declined → release the trip back to the pool so dispatcher
-      // (or another driver in a multi-driver demo) can pick it up.
       if (offer.tripId != null) {
         try {
           await ref
@@ -78,8 +75,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
   Future<bool> _acceptOffer(IncomingTripOffer offer) async {
     try {
-      // Real offer from polling → the trip already exists with this
-      // driver assigned; just load it and navigate.
       if (offer.tripId != null) {
         final tripService = ref.read(tripServiceProvider);
         final active = await tripService.loadActiveTrip(offer.tripId!);
@@ -91,7 +86,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         context.go('/driver/navigation/${active.tripId}');
         return true;
       }
-      // Mock offer fallback (no real trip in Mongo) — Phase 2 path.
       throw Exception('Offer không có tripId — cần passenger book trước');
     } catch (e) {
       if (mounted) WgToast.error(context, 'Không nhận được chuyến: $e');
@@ -112,7 +106,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
         isOnline ? 'Đã bật nhận chuyến' : 'Đã tắt nhận chuyến',
       );
       if (isOnline) {
-        // Reset the poll cursor so it starts looking immediately.
         ref.invalidate(incomingTripPollProvider);
       }
     } catch (e) {
@@ -128,7 +121,6 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     final statsAsync = ref.watch(driverTodayStatsProvider);
     final loc = locAsync.valueOrNull ?? kDanangFallback;
 
-    // Watch incoming trip stream — when an offer arrives, show modal.
     ref.listen<AsyncValue<IncomingTripOffer?>>(incomingTripPollProvider, (
       prev,
       next,
@@ -141,9 +133,9 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
 
     final mq = MediaQuery.of(context);
     const panelMin = 96.0;
-    final panelMax = mq.size.height * 0.85;
-
+    final panelMax = mq.size.height * 0.72;
     final isOnline = statusAsync.valueOrNull == DriverStatus.online;
+    final isDriverLoaded = driverAsync.valueOrNull != null;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -152,14 +144,14 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           SlidingUpPanel(
             minHeight: panelMin,
             maxHeight: panelMax,
-            defaultPanelState: PanelState.OPEN,
+            defaultPanelState: PanelState.CLOSED,
             snapPoint: 0.5,
             parallaxEnabled: true,
             parallaxOffset: 0.4,
             color: AppColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(32)),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
             backdropEnabled: true,
-            backdropOpacity: 0.25,
+            backdropOpacity: 0.2,
             boxShadow: const [
               BoxShadow(
                 blurRadius: 24,
@@ -167,11 +159,8 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
                 offset: Offset(0, -4),
               ),
             ],
-            panelBuilder: (sc) => _Panel(
-              scrollController: sc,
-              statsAsync: statsAsync,
-              isOnline: isOnline,
-            ),
+            panelBuilder: (sc) =>
+                _Panel(scrollController: sc, statsAsync: statsAsync),
             body: _MapBody(onMapCreated: (c) => _map = c, driverPos: loc),
           ),
           Positioned(
@@ -181,15 +170,13 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             child: _TopHeader(driver: driverAsync.valueOrNull),
           ),
           Positioned(
-            top: mq.padding.top + 76,
-            left: 0,
-            right: 0,
-            child: Center(
-              child: WgStatusToggle(
-                online: statusAsync.valueOrNull == DriverStatus.online,
-                disabled: driverAsync.valueOrNull == null,
-                onToggle: (_) => _toggleStatus(loc),
-              ),
+            top: mq.padding.top + 84,
+            left: 16,
+            right: 16,
+            child: _StatusHeroCard(
+              isOnline: isOnline,
+              disabled: !isDriverLoaded,
+              onToggle: () => _toggleStatus(loc),
             ),
           ),
           Positioned(
@@ -230,8 +217,6 @@ class _MapBody extends StatelessWidget {
           Circle(
             circleId: CircleId(h.id),
             center: LatLng(h.lat, h.lng),
-            // CircleLayer used pixels; Google Maps uses meters. ~500m
-            // visualises the demand zone well at default city zoom.
             radius: h.heatRadius * 8,
             fillColor: h.heatColor.withValues(alpha: 0.18),
             strokeColor: h.heatColor.withValues(alpha: 0.55),
@@ -259,17 +244,16 @@ class _TopHeader extends StatelessWidget {
   Widget build(BuildContext context) {
     return Row(
       children: [
-        Flexible(
+        Expanded(
           child: WgGlass(
             borderRadius: BorderRadius.circular(999),
             opacity: 0.82,
-            padding: const EdgeInsets.fromLTRB(6, 6, 16, 6),
+            padding: const EdgeInsets.fromLTRB(6, 6, 14, 6),
             child: Row(
-              mainAxisSize: MainAxisSize.min,
               children: [
                 WgAvatar(name: driver?.name ?? 'WG', size: 36),
                 const SizedBox(width: 10),
-                Flexible(
+                Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     mainAxisSize: MainAxisSize.min,
@@ -291,6 +275,8 @@ class _TopHeader extends StatelessWidget {
                           fontFamily: 'monospace',
                           letterSpacing: 0.8,
                         ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ],
                   ),
@@ -299,7 +285,7 @@ class _TopHeader extends StatelessWidget {
             ),
           ),
         ),
-        const Spacer(),
+        const SizedBox(width: 10),
         _GlassIcon(
           icon: PhosphorIconsRegular.bell,
           hasDot: true,
@@ -323,7 +309,7 @@ class _GlassIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return WgGlass(
-      borderRadius: BorderRadius.circular(22),
+      borderRadius: BorderRadius.circular(20),
       opacity: 0.82,
       child: Material(
         color: Colors.transparent,
@@ -332,20 +318,20 @@ class _GlassIcon extends StatelessWidget {
             HapticFeedback.lightImpact();
             onTap();
           },
-          borderRadius: BorderRadius.circular(22),
+          borderRadius: BorderRadius.circular(20),
           child: SizedBox(
-            width: 44,
-            height: 44,
+            width: 40,
+            height: 40,
             child: Stack(
               children: [
-                Center(child: Icon(icon, color: AppColors.ink700, size: 22)),
+                Center(child: Icon(icon, color: AppColors.ink700, size: 20)),
                 if (hasDot)
                   Positioned(
-                    top: 11,
-                    right: 12,
+                    top: 10,
+                    right: 11,
                     child: Container(
-                      width: 8,
-                      height: 8,
+                      width: 7,
+                      height: 7,
                       decoration: BoxDecoration(
                         color: AppColors.danger,
                         shape: BoxShape.circle,
@@ -362,13 +348,103 @@ class _GlassIcon extends StatelessWidget {
   }
 }
 
+class _StatusHeroCard extends StatelessWidget {
+  const _StatusHeroCard({
+    required this.isOnline,
+    required this.disabled,
+    required this.onToggle,
+  });
+
+  final bool isOnline;
+  final bool disabled;
+  final VoidCallback onToggle;
+
+  @override
+  Widget build(BuildContext context) {
+    return Opacity(
+      opacity: disabled ? 0.6 : 1.0,
+      child: WgGlass(
+        blur: 30,
+        opacity: 0.92,
+        borderRadius: BorderRadius.circular(24),
+        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            AnimatedContainer(
+              duration: const Duration(milliseconds: 320),
+              curve: Curves.easeOutCubic,
+              width: 64,
+              height: 64,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: isOnline
+                      ? const [AppColors.primary400, AppColors.primary600]
+                      : const [AppColors.ink300, AppColors.ink400],
+                ),
+                boxShadow: isOnline
+                    ? AppShadows.heroGlow(AppColors.primary500)
+                    : const [],
+              ),
+              child: Icon(
+                isOnline
+                    ? PhosphorIconsFill.carProfile
+                    : PhosphorIconsFill.power,
+                color: AppColors.white,
+                size: 30,
+              ),
+            ),
+            const SizedBox(height: 14),
+            Text(
+              isOnline ? 'Đang nhận chuyến' : 'Tạm nghỉ',
+              style: AppTypography.h2.copyWith(
+                color: AppColors.ink900,
+                fontWeight: FontWeight.w800,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 4),
+            Text(
+              isOnline
+                  ? 'Hệ thống sẽ tự động ghép khách cho bạn'
+                  : 'Bật để bắt đầu nhận chuyến',
+              style: AppTypography.caption.copyWith(color: AppColors.ink500),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 14),
+            Transform.scale(
+              scale: 1.2,
+              child: CupertinoSwitch(
+                value: isOnline,
+                activeTrackColor: AppColors.primary500,
+                onChanged: disabled
+                    ? null
+                    : (_) {
+                        HapticFeedback.mediumImpact();
+                        onToggle();
+                      },
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 class _RecenterFab extends StatelessWidget {
   const _RecenterFab({required this.onTap});
   final VoidCallback onTap;
   @override
   Widget build(BuildContext context) {
     return DecoratedBox(
-      decoration: BoxDecoration(
+      decoration: const BoxDecoration(
         shape: BoxShape.circle,
         boxShadow: AppShadows.md,
       ),
@@ -394,14 +470,9 @@ class _RecenterFab extends StatelessWidget {
 }
 
 class _Panel extends ConsumerWidget {
-  const _Panel({
-    required this.scrollController,
-    required this.statsAsync,
-    required this.isOnline,
-  });
+  const _Panel({required this.scrollController, required this.statsAsync});
   final ScrollController scrollController;
   final AsyncValue statsAsync;
-  final bool isOnline;
 
   String _short(int vnd) {
     if (vnd == 0) return '0đ';
@@ -437,15 +508,6 @@ class _Panel extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: _StatusHeroCard(
-            isOnline: isOnline,
-            earningsLabel: _short(stats?.earningsVnd ?? 0),
-            tripCount: stats?.tripCount ?? 0,
-          ),
-        ),
         const SizedBox(height: 14),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -459,35 +521,20 @@ class _Panel extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 20),
-        const Divider(height: 1, color: AppColors.ink100),
-        const SizedBox(height: 16),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
-          child: Text(
-            '🔥 Khu vực đông khách gần bạn',
-            style: AppTypography.bodyLarge.copyWith(
-              color: AppColors.ink900,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
+        const SizedBox(height: 18),
+        _SectionHeader(
+          icon: PhosphorIconsFill.fire,
+          iconColor: AppColors.danger,
+          title: 'Khu vực đông khách',
+          trailing: 'Xem tất cả',
+          onTrailing: () =>
+              WgToast.info(context, 'Xem hotspot toàn thành phố sắp ra mắt'),
         ),
-        const SizedBox(height: 12),
-        ...kHotspots.asMap().entries.map(
-          (e) => Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 10),
-            child: HotspotCard(
-              hotspot: e.value,
-              onTap: () => WgToast.info(
-                context,
-                'Đang chỉ đường tới ${e.value.shortLabel}',
-              ),
-            ),
-          ),
-        ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
+        const _HotspotHorizontalList(),
+        const SizedBox(height: 18),
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 20),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
           child: WgIncentiveCard(
             title: 'Thưởng chăm chỉ',
             completed: completedToday,
@@ -495,221 +542,177 @@ class _Panel extends ConsumerWidget {
             rewardVnd: 200000,
           ),
         ),
-        const SizedBox(height: 14),
-        _BottomActionsRow(),
+        const SizedBox(height: 12),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            children: [
+              Expanded(
+                child: _ActionButton(
+                  icon: PhosphorIconsRegular.wallet,
+                  label: 'Ví',
+                  onTap: () => context.push('/driver/wallet'),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: _ActionButton(
+                  icon: PhosphorIconsRegular.trendUp,
+                  label: 'Hiệu suất',
+                  onTap: () => context.push('/driver/performance'),
+                ),
+              ),
+            ],
+          ),
+        ),
         const SizedBox(height: 24),
       ],
     );
   }
 }
 
-class _BottomActionsRow extends StatelessWidget {
+class _SectionHeader extends StatelessWidget {
+  const _SectionHeader({
+    required this.icon,
+    required this.iconColor,
+    required this.title,
+    this.trailing,
+    this.onTrailing,
+  });
+
+  final IconData icon;
+  final Color iconColor;
+  final String title;
+  final String? trailing;
+  final VoidCallback? onTrailing;
+
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
         children: [
+          Icon(icon, color: iconColor, size: 18),
+          const SizedBox(width: 6),
           Expanded(
-            child: _ActionButton(
-              icon: PhosphorIconsRegular.wallet,
-              label: 'Ví',
-              onTap: () => context.push('/driver/wallet'),
+            child: Text(
+              title,
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.ink900,
+                fontWeight: FontWeight.w700,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
           ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _ActionButton(
-              icon: PhosphorIconsRegular.trendUp,
-              label: 'Hiệu suất',
-              onTap: () => context.push('/driver/performance'),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-class _StatusHeroCard extends StatelessWidget {
-  const _StatusHeroCard({
-    required this.isOnline,
-    required this.earningsLabel,
-    required this.tripCount,
-  });
-
-  final bool isOnline;
-  final String earningsLabel;
-  final int tripCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final gradient = isOnline
-        ? const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.primary500, AppColors.primary700],
-          )
-        : const LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [AppColors.ink700, AppColors.ink900],
-          );
-    final glowColor = isOnline ? AppColors.primary500 : AppColors.ink900;
-
-    return Container(
-      padding: const EdgeInsets.fromLTRB(18, 16, 18, 18),
-      decoration: BoxDecoration(
-        gradient: gradient,
-        borderRadius: BorderRadius.circular(24),
-        boxShadow: [
-          BoxShadow(
-            color: glowColor.withValues(alpha: 0.25),
-            blurRadius: 28,
-            offset: const Offset(0, 10),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              _PulseDot(active: isOnline),
-              const SizedBox(width: 8),
-              Text(
-                isOnline ? 'Đang sẵn sàng nhận chuyến' : 'Bạn đang tạm nghỉ',
+          if (trailing != null)
+            GestureDetector(
+              onTap: onTrailing,
+              child: Text(
+                trailing!,
                 style: AppTypography.caption.copyWith(
-                  color: AppColors.white.withValues(alpha: 0.86),
+                  color: AppColors.primary500,
                   fontWeight: FontWeight.w600,
-                  letterSpacing: 0.3,
                 ),
               ),
-            ],
-          ),
-          const SizedBox(height: 10),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      earningsLabel,
-                      style: AppTypography.h1.copyWith(
-                        color: AppColors.white,
-                        fontWeight: FontWeight.w800,
-                        height: 1.1,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      'Thu nhập hôm nay · $tripCount chuyến',
-                      style: AppTypography.micro.copyWith(
-                        color: AppColors.white.withValues(alpha: 0.75),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: AppColors.white.withValues(alpha: 0.18),
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: AppColors.white.withValues(alpha: 0.25),
-                    width: 0.5,
-                  ),
-                ),
-                child: const Icon(
-                  PhosphorIconsFill.lightning,
-                  color: AppColors.white,
-                  size: 22,
-                ),
-              ),
-            ],
-          ),
+            ),
         ],
       ),
     );
   }
 }
 
-class _PulseDot extends StatefulWidget {
-  const _PulseDot({required this.active});
-  final bool active;
-  @override
-  State<_PulseDot> createState() => _PulseDotState();
-}
-
-class _PulseDotState extends State<_PulseDot>
-    with SingleTickerProviderStateMixin {
-  late final AnimationController _c;
-
-  @override
-  void initState() {
-    super.initState();
-    _c = AnimationController(
-      vsync: this,
-      duration: const Duration(milliseconds: 1400),
-    );
-    if (widget.active) _c.repeat();
-  }
-
-  @override
-  void didUpdateWidget(covariant _PulseDot old) {
-    super.didUpdateWidget(old);
-    if (widget.active && !_c.isAnimating) {
-      _c.repeat();
-    } else if (!widget.active && _c.isAnimating) {
-      _c.stop();
-      _c.reset();
-    }
-  }
-
-  @override
-  void dispose() {
-    _c.dispose();
-    super.dispose();
-  }
+class _HotspotHorizontalList extends StatelessWidget {
+  const _HotspotHorizontalList();
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 12,
-      height: 12,
-      child: AnimatedBuilder(
-        animation: _c,
-        builder: (_, _) {
-          final t = _c.value;
-          return Stack(
-            alignment: Alignment.center,
-            children: [
-              if (widget.active)
+      height: 116,
+      child: ListView.separated(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        itemCount: kHotspots.length,
+        separatorBuilder: (_, _) => const SizedBox(width: 10),
+        itemBuilder: (_, i) => _HotspotMiniCard(hotspot: kHotspots[i]),
+      ),
+    );
+  }
+}
+
+class _HotspotMiniCard extends StatelessWidget {
+  const _HotspotMiniCard({required this.hotspot});
+  final Hotspot hotspot;
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () =>
+          WgToast.info(context, 'Đang chỉ đường tới ${hotspot.shortLabel}'),
+      child: Container(
+        width: 200,
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(18),
+          boxShadow: AppShadows.xs,
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
                 Container(
-                  width: 12 + 12 * t,
-                  height: 12 + 12 * t,
+                  width: 32,
+                  height: 32,
                   decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: AppColors.white.withValues(alpha: 0.45 * (1 - t)),
+                    color: hotspot.heatColor.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(hotspot.icon, color: hotspot.heatColor, size: 18),
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    hotspot.shortLabel,
+                    style: AppTypography.body.copyWith(
+                      color: AppColors.ink900,
+                      fontWeight: FontWeight.w700,
+                      fontSize: 14,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                   ),
                 ),
-              Container(
-                width: 8,
-                height: 8,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: widget.active
-                      ? AppColors.white
-                      : AppColors.white.withValues(alpha: 0.5),
+              ],
+            ),
+            Row(
+              children: [
+                Text(
+                  '${hotspot.activeRequests}',
+                  style: AppTypography.h3.copyWith(
+                    color: hotspot.heatColor,
+                    fontWeight: FontWeight.w800,
+                  ),
                 ),
-              ),
-            ],
-          );
-        },
+                const SizedBox(width: 4),
+                Text(
+                  'yêu cầu',
+                  style: AppTypography.micro.copyWith(color: AppColors.ink500),
+                ),
+                const Spacer(),
+                Text(
+                  '${hotspot.distanceKm.toStringAsFixed(1)} km',
+                  style: AppTypography.micro.copyWith(
+                    color: AppColors.ink500,
+                    fontFamily: 'monospace',
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -740,11 +743,15 @@ class _ActionButton extends StatelessWidget {
             children: [
               Icon(icon, color: AppColors.primary700, size: 20),
               const SizedBox(width: 8),
-              Text(
-                label,
-                style: AppTypography.body.copyWith(
-                  color: AppColors.primary700,
-                  fontWeight: FontWeight.w700,
+              Flexible(
+                child: Text(
+                  label,
+                  style: AppTypography.body.copyWith(
+                    color: AppColors.primary700,
+                    fontWeight: FontWeight.w700,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
                 ),
               ),
             ],
