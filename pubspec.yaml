@@ -27,7 +27,12 @@ dependencies:
   lottie: ^3.3.0
   sliding_up_panel: ^2.0.0+1
   dart_geohash: ^2.0.2
-  google_maps_flutter: ^2.10.0
+  # Phase 5G migration: Google Maps SDK removed (billing REQUEST_DENIED).
+  # Keep flutter_polyline_points because TrackAsia returns the same
+  # encoded-polyline format Google does — the decoder is reused as-is.
+  # Commented for one-line rollback if TrackAsia ever flakes:
+  # google_maps_flutter: ^2.10.0
+  maplibre_gl: ^0.26.1
   flutter_polyline_points: ^2.1.0
   http: ^1.2.2
   phosphor_flutter: ^2.1.0

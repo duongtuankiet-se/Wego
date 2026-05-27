@@ -4,13 +4,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/wg_button.dart';
+import '../../core/widgets/wg_trackasia_map.dart';
 import '../../models/place.dart';
 import '../../providers/location_provider.dart';
 import '../../services/places_service.dart';
@@ -36,12 +37,13 @@ class MapPickerScreen extends ConsumerStatefulWidget {
 
 class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
     with TickerProviderStateMixin {
-  GoogleMapController? _mapController;
+  MapLibreMapController? _mapController;
   late LatLng _centerPosition;
   String? _currentAddress;
   bool _isGeocoding = false;
   bool _hasError = false;
   Timer? _debounceTimer;
+  bool _moving = false;
 
   late final AnimationController _pinAnimController;
   late final Animation<double> _pinBounce;
@@ -69,28 +71,46 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
   void dispose() {
     _debounceTimer?.cancel();
     _pinAnimController.dispose();
-    _mapController?.dispose();
+    // MapLibreMapController is owned by MapLibreMap widget.
     super.dispose();
   }
 
-  void _onCameraMoveStarted() {
-    if (!_pinAnimController.isAnimating &&
-        _pinAnimController.status != AnimationStatus.completed) {
-      HapticFeedback.selectionClick();
-    }
-    _pinAnimController.forward();
-  }
-
-  void _onCameraMove(CameraPosition position) {
-    _centerPosition = position.target;
+  /// Sample camera position on every frame while the user is dragging,
+  /// then debounce reverse-geocode on idle. MapLibre doesn't expose a
+  /// `onCameraMoveStarted` like GoogleMap; we infer it from successive
+  /// frames where the controller's camera target moved between idles.
+  Future<void> _pollCenter() async {
+    if (!_moving) return;
+    final ctrl = _mapController;
+    if (ctrl == null) return;
+    final pos = ctrl.cameraPosition?.target;
+    if (pos != null) _centerPosition = pos;
+    Future<void>.delayed(const Duration(milliseconds: 80), _pollCenter);
   }
 
   void _onCameraIdle() {
+    _moving = false;
+    final ctrl = _mapController;
+    if (ctrl != null) {
+      final pos = ctrl.cameraPosition?.target;
+      if (pos != null) _centerPosition = pos;
+    }
     _pinAnimController.reverse();
     _debounceTimer?.cancel();
     _debounceTimer = Timer(const Duration(milliseconds: 500), () {
       _reverseGeocode(_centerPosition);
     });
+  }
+
+  void _onCameraTrackingDismissed() {
+    // Fires when the user grabs the map — kick off the pin lift + the
+    // light haptic that signals "dragging started".
+    if (!_moving) {
+      HapticFeedback.selectionClick();
+      _moving = true;
+      _pinAnimController.forward();
+      _pollCenter();
+    }
   }
 
   Future<void> _reverseGeocode(LatLng position) async {
@@ -155,20 +175,14 @@ class _MapPickerScreenState extends ConsumerState<MapPickerScreen>
     return Scaffold(
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(
-              target: _centerPosition,
-              zoom: 16,
-            ),
+          WgTrackAsiaMap(
+            initialCenter: _centerPosition,
+            initialZoom: 16,
             onMapCreated: (c) => _mapController = c,
-            onCameraMoveStarted: _onCameraMoveStarted,
-            onCameraMove: _onCameraMove,
             onCameraIdle: _onCameraIdle,
+            onCameraTrackingDismissed: _onCameraTrackingDismissed,
+            trackCameraPosition: true,
             myLocationEnabled: true,
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            compassEnabled: false,
-            mapToolbarEnabled: false,
           ),
 
           // Fixed center pin overlay

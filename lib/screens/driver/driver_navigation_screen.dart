@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../core/theme/app_colors.dart';
@@ -22,6 +22,7 @@ import '../../providers/driver_service_provider.dart';
 import '../../providers/trip_service_provider.dart';
 import '../../services/directions_service.dart';
 import '../../models/trip.dart';
+import '../../core/widgets/wg_trackasia_map.dart';
 import '_widgets/navigation_instruction_card.dart';
 
 class DriverNavigationScreen extends ConsumerStatefulWidget {
@@ -36,7 +37,10 @@ enum _Phase { toPickup, arrived, toDropoff }
 
 class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     with TickerProviderStateMixin {
-  GoogleMapController? _map;
+  MapLibreMapController? _map;
+  Line? _routeLine;
+  Circle? _carCircle;
+  bool _styleReady = false;
   late final AnimationController _carAnim;
   Timer? _phaseTimer;
   Timer? _instructionTimer;
@@ -263,7 +267,6 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     _carAnim
       ..removeListener(_tickCar)
       ..dispose();
-    _map?.dispose();
     super.dispose();
   }
 
@@ -384,6 +387,74 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     }
   }
 
+  Future<void> _onStyleLoaded(
+    LatLng pickup,
+    LatLng dropoff,
+    LatLng carPos,
+    LatLng polyEnd,
+  ) async {
+    final ctrl = _map;
+    if (ctrl == null) return;
+    final color = _phase == _Phase.toDropoff ? '#0FB67E' : '#6B7280';
+    _routeLine = await ctrl.addLine(
+      LineOptions(
+        geometry: _routePoints ?? [carPos, polyEnd],
+        lineColor: color,
+        lineWidth: 5,
+        lineJoin: 'round',
+      ),
+    );
+    await ctrl.addCircle(
+      CircleOptions(
+        geometry: pickup,
+        circleRadius: 8,
+        circleColor: '#10B981',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2.5,
+      ),
+    );
+    await ctrl.addCircle(
+      CircleOptions(
+        geometry: dropoff,
+        circleRadius: 8,
+        circleColor: '#EF4444',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2.5,
+      ),
+    );
+    _carCircle = await ctrl.addCircle(
+      CircleOptions(
+        geometry: carPos,
+        circleRadius: 9,
+        circleColor: '#0FB67E',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 3,
+      ),
+    );
+    _styleReady = true;
+    _fitBounds(carPos, polyEnd);
+    _refreshRoute();
+  }
+
+  /// Push the moving car position + updated route polyline into the
+  /// existing circle/line annotations. Called from build() so every
+  /// animation tick stays in sync.
+  void _syncAnnotations(LatLng carPos) {
+    final ctrl = _map;
+    if (!_styleReady || ctrl == null) return;
+    if (_carCircle != null) {
+      ctrl.updateCircle(_carCircle!, CircleOptions(geometry: carPos));
+    }
+    final pts = _routePoints;
+    if (pts != null && _routeLine != null) {
+      final color = _phase == _Phase.toDropoff ? '#0FB67E' : '#6B7280';
+      ctrl.updateLine(
+        _routeLine!,
+        LineOptions(geometry: pts, lineColor: color),
+      );
+    }
+  }
+
   void _fitBounds(LatLng a, LatLng b) {
     final bounds = LatLngBounds(
       southwest: LatLng(
@@ -395,8 +466,16 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
         a.longitude > b.longitude ? a.longitude : b.longitude,
       ),
     );
-    Future.delayed(const Duration(milliseconds: 300), () {
-      _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    Future<void>.delayed(const Duration(milliseconds: 300), () {
+      _map?.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          bounds,
+          left: 80,
+          right: 80,
+          top: 80,
+          bottom: 80,
+        ),
+      );
     });
   }
 
@@ -412,57 +491,24 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
 
     final progress = _carAnim.value;
     final polyEnd = _phase == _Phase.toDropoff ? dropoff : pickup;
-    final polyPoints = _routePoints ?? <LatLng>[carPos, polyEnd];
+
+    // Sync live annotations (route line + car position) on rebuild.
+    _syncAnnotations(carPos);
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: Stack(
         children: [
-          GoogleMap(
-            initialCameraPosition: CameraPosition(target: carPos, zoom: 14),
+          WgTrackAsiaMap(
+            initialCenter: carPos,
+            initialZoom: 14,
             onMapCreated: (c) {
               _map = c;
-              _fitBounds(carPos, polyEnd);
-              _refreshRoute();
             },
-            myLocationButtonEnabled: false,
-            zoomControlsEnabled: false,
-            mapToolbarEnabled: false,
+            onStyleLoadedCallback: () =>
+                _onStyleLoaded(pickup, dropoff, carPos, polyEnd),
             rotateGesturesEnabled: false,
             tiltGesturesEnabled: false,
-            polylines: <Polyline>{
-              Polyline(
-                polylineId: const PolylineId('leg'),
-                points: polyPoints,
-                color: _phase == _Phase.toDropoff
-                    ? AppColors.primary500
-                    : AppColors.ink500,
-                width: 5,
-              ),
-            },
-            markers: <Marker>{
-              Marker(
-                markerId: const MarkerId('pickup'),
-                position: pickup,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueGreen,
-                ),
-              ),
-              Marker(
-                markerId: const MarkerId('dropoff'),
-                position: dropoff,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueRed,
-                ),
-              ),
-              Marker(
-                markerId: const MarkerId('driver'),
-                position: carPos,
-                icon: BitmapDescriptor.defaultMarkerWithHue(
-                  BitmapDescriptor.hueAzure,
-                ),
-              ),
-            },
           ),
           // Top: instruction card
           Positioned(

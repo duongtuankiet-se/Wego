@@ -43,11 +43,12 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
 
-        // 65k method limit guard — Firebase + Google Maps push us over.
+        // 65k method limit guard — Firebase + maplibre-native push us over.
         multiDexEnabled = true
 
-        // Injected into AndroidManifest <meta-data android:name="com.google.android.geo.API_KEY" .../>
-        manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
+        // Phase 5G: Google Maps SDK removed — placeholder no longer
+        // needed. Commented for rollback.
+        // manifestPlaceholders["MAPS_API_KEY"] = mapsApiKey
     }
 
     buildTypes {

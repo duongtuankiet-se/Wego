@@ -6,11 +6,14 @@
         android:label="WeGo"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
-        <!-- Google Maps SDK API key, injected from android/local.properties
-             via manifestPlaceholders in build.gradle.kts. -->
+        <!-- Phase 5G: Google Maps SDK removed (billing REQUEST_DENIED) —
+             map tiles now load from TrackAsia (vector PBF) via the
+             maplibre_gl Flutter plugin, which doesn't need a manifest
+             key. Block kept commented for one-step rollback.
         <meta-data
             android:name="com.google.android.geo.API_KEY"
             android:value="${MAPS_API_KEY}"/>
+        -->
         <activity
             android:name=".MainActivity"
             android:exported="true"
