@@ -7,11 +7,12 @@ import 'package:go_router/go_router.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/wg_chip.dart';
+import '../../core/widgets/wg_draggable_sheet.dart';
+import '../../core/widgets/wg_recenter_fab.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../core/widgets/wg_trackasia_map.dart';
 import '../../models/trip.dart';
@@ -358,45 +359,33 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     }
 
     final mq = MediaQuery.of(context);
-    const panelMin = 320.0;
-    final panelMax = mq.size.height * 0.85;
     final pickup = LatLng(trip.trip.pickupLat, trip.trip.pickupLng);
     final dropoff = LatLng(trip.trip.dropoffLat, trip.trip.dropoffLng);
     final carPos = _carPos ?? pickup;
 
+    // Sheet defaults to 40% so the driver card + status pill fit, drops
+    // to 25% (peek) when the user wants to see the car move along the
+    // polyline, expands to 80% for the cancel action + full route.
+    const sheetInitial = 0.40;
+    const sheetMin = 0.25;
+    const sheetMax = 0.80;
+    const sheetSnaps = <double>[sheetMin, sheetInitial, sheetMax];
+    final fabBottom = mq.size.height * sheetInitial + 16;
+
     return Scaffold(
+      extendBodyBehindAppBar: true,
       backgroundColor: AppColors.offWhite,
       body: Stack(
         children: [
-          SlidingUpPanel(
-            minHeight: panelMin,
-            maxHeight: panelMax,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            color: AppColors.white,
-            backdropEnabled: true,
-            backdropOpacity: 0.25,
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 24,
-                color: Color(0x1F000000),
-                offset: Offset(0, -4),
-              ),
-            ],
-            panelBuilder: (sc) => _PanelContent(
-              scrollController: sc,
-              trip: trip,
-              onCancel: _cancelTrip,
-            ),
-            body: _MapBody(
-              onMapCreated: (c) {
-                _map = c;
-                _fitBounds(pickup, dropoff, carPos);
-              },
-              pickup: pickup,
-              dropoff: dropoff,
-              carPos: carPos,
-              routePoints: _routePoints ?? <LatLng>[pickup, dropoff],
-            ),
+          _MapBody(
+            onMapCreated: (c) {
+              _map = c;
+              _fitBounds(pickup, dropoff, carPos);
+            },
+            pickup: pickup,
+            dropoff: dropoff,
+            carPos: carPos,
+            routePoints: _routePoints ?? <LatLng>[pickup, dropoff],
           ),
           Positioned(
             top: mq.padding.top + 16,
@@ -417,6 +406,24 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
                 context,
                 'Đã gửi cảnh báo SOS. Liên hệ 112 nếu khẩn cấp.',
               ),
+            ),
+          ),
+          Positioned(
+            right: 16,
+            bottom: fabBottom,
+            child: WgRecenterFab(
+              onTap: () => _fitBounds(pickup, dropoff, carPos),
+            ),
+          ),
+          WgDraggableSheet(
+            initialSize: sheetInitial,
+            minSize: sheetMin,
+            maxSize: sheetMax,
+            snapSizes: sheetSnaps,
+            builder: (sc) => _PanelContent(
+              scrollController: sc,
+              trip: trip,
+              onCancel: _cancelTrip,
             ),
           ),
         ],
@@ -587,22 +594,11 @@ class _PanelContent extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // The grabber pill + sheet chrome are owned by WgDraggableSheet.
     return ListView(
       controller: scrollController,
-      padding: EdgeInsets.zero,
+      padding: const EdgeInsets.fromLTRB(0, 4, 0, 24),
       children: [
-        const SizedBox(height: 10),
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.ink300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-        ),
-        const SizedBox(height: 14),
         DriverInfoCard(driver: trip.driver, tripType: trip.trip.type),
         const SizedBox(height: 14),
         RouteSummaryCard(

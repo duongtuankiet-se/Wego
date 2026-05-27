@@ -22,6 +22,8 @@ import '../../providers/driver_service_provider.dart';
 import '../../providers/trip_service_provider.dart';
 import '../../services/directions_service.dart';
 import '../../models/trip.dart';
+import '../../core/widgets/wg_draggable_sheet.dart';
+import '../../core/widgets/wg_recenter_fab.dart';
 import '../../core/widgets/wg_trackasia_map.dart';
 import '_widgets/navigation_instruction_card.dart';
 
@@ -62,6 +64,11 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
   /// Set once per phase the moment the car enters the 50m geofence so
   /// repeat triggers don't fire while idling at the curb.
   bool _arrivalFired = false;
+
+  /// When true, the camera tracks the car each tick. The driver can
+  /// disable it by manually panning (Phase 5K UX trade-off) — for now
+  /// we just expose a toggle on the FAB.
+  bool _autoFollow = true;
 
   List<LatLng>? get _routePoints => _route?.points;
 
@@ -144,6 +151,9 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
     setState(() => _carPos = newPos);
     _advanceStepIfClose(newPos);
     _checkGeofence(newPos);
+    if (_autoFollow) {
+      _map?.animateCamera(CameraUpdate.newLatLng(newPos));
+    }
   }
 
   /// Phase auto-advance when the car physically arrives. Fires once per
@@ -523,51 +533,65 @@ class _DriverNavigationScreenState extends ConsumerState<DriverNavigationScreen>
             left: 16,
             child: _SpeedLimitBadge(),
           ),
-          // Floating buttons right
+          // Mute toggle stays Positioned — it's a quick action, not
+          // worth a sheet slot.
           Positioned(
             top: mq.padding.top + 168,
             right: 16,
-            child: Column(
-              children: [
-                _CircleBtn(
-                  icon: _muted
-                      ? PhosphorIconsRegular.speakerSlash
-                      : PhosphorIconsRegular.speakerHigh,
-                  onTap: () {
-                    setState(() => _muted = !_muted);
-                    WgToast.info(
-                      context,
-                      _muted ? 'Đã tắt tiếng' : 'Đã bật tiếng',
-                    );
-                  },
-                ),
-                const SizedBox(height: 12),
-                _CircleBtn(
-                  icon: PhosphorIconsFill.crosshair,
-                  iconColor: AppColors.primary500,
-                  onTap: () {
-                    HapticFeedback.mediumImpact();
-                    _map?.animateCamera(CameraUpdate.newLatLngZoom(carPos, 16));
-                  },
-                ),
-              ],
+            child: _CircleBtn(
+              icon: _muted
+                  ? PhosphorIconsRegular.speakerSlash
+                  : PhosphorIconsRegular.speakerHigh,
+              onTap: () {
+                setState(() => _muted = !_muted);
+                WgToast.info(context, _muted ? 'Đã tắt tiếng' : 'Đã bật tiếng');
+              },
             ),
           ),
-          // Bottom panel
+          // Recenter / auto-follow toggle sits just above the sheet
+          // peek so the driver can re-anchor the camera after a manual
+          // pan without crowding the instruction card.
           Positioned(
-            bottom: 0,
-            left: 0,
-            right: 0,
-            child: _BottomPanel(
-              phase: _phase,
-              progress: progress,
-              price: trip.trip.price,
-              passengerName: trip.driver.name, // mock: passenger label
-              passengerRating: trip.driver.rating,
-              tripTypeLabel: trip.trip.type.name == 'shared'
-                  ? 'Xe ghép'
-                  : 'Xe riêng',
-              onMarkPickedUp: _markPickedUp,
+            right: 16,
+            bottom: mq.size.height * 0.35 + 16,
+            child: WgRecenterFab(
+              icon: _autoFollow
+                  ? PhosphorIconsFill.navigationArrow
+                  : PhosphorIconsRegular.crosshair,
+              onTap: () {
+                setState(() => _autoFollow = !_autoFollow);
+                if (_autoFollow) {
+                  _map?.animateCamera(CameraUpdate.newLatLngZoom(carPos, 16));
+                }
+                WgToast.info(
+                  context,
+                  _autoFollow ? 'Đang theo dõi xe' : 'Tắt theo dõi tự động',
+                );
+              },
+            ),
+          ),
+          // Trip state panel — draggable so the driver can shrink it
+          // for full-screen map view or pull up for the full passenger
+          // / payment summary.
+          WgDraggableSheet(
+            initialSize: 0.35,
+            minSize: 0.20,
+            maxSize: 0.75,
+            snapSizes: const [0.20, 0.35, 0.75],
+            builder: (sc) => SingleChildScrollView(
+              controller: sc,
+              padding: EdgeInsets.zero,
+              child: _BottomPanel(
+                phase: _phase,
+                progress: progress,
+                price: trip.trip.price,
+                passengerName: trip.driver.name,
+                passengerRating: trip.driver.rating,
+                tripTypeLabel: trip.trip.type.name == 'shared'
+                    ? 'Xe ghép'
+                    : 'Xe riêng',
+                onMarkPickedUp: _markPickedUp,
+              ),
             ),
           ),
         ],
@@ -620,14 +644,10 @@ class _SpeedLimitBadge extends StatelessWidget {
 }
 
 class _CircleBtn extends StatelessWidget {
-  const _CircleBtn({
-    required this.icon,
-    required this.onTap,
-    this.iconColor = AppColors.ink700,
-  });
+  const _CircleBtn({required this.icon, required this.onTap});
   final IconData icon;
   final VoidCallback onTap;
-  final Color iconColor;
+  final Color iconColor = AppColors.ink700;
   @override
   Widget build(BuildContext context) {
     return Material(
@@ -675,19 +695,10 @@ class _BottomPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final inset = MediaQuery.of(context).padding.bottom;
-    return Container(
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-        boxShadow: [
-          BoxShadow(
-            color: AppColors.ink900.withValues(alpha: 0.14),
-            blurRadius: 24,
-            offset: const Offset(0, -6),
-          ),
-        ],
-      ),
-      padding: EdgeInsets.fromLTRB(20, 18, 20, inset + 16),
+    // Sheet chrome (rounded top + shadow + grabber) is owned by the
+    // parent WgDraggableSheet. We only own the inner padding.
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 4, 20, inset + 16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
