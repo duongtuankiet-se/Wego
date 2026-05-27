@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
+import 'package:google_sign_in/google_sign_in.dart';
 
 /// Wraps Firebase Phone Auth into a 2-step API:
 ///   1. [sendOtp] — push SMS; returns success/error.
@@ -14,6 +15,11 @@ class AuthService {
 
   static final _auth = FirebaseAuth.instance;
   static String? _verificationId;
+
+  /// Scopes we actually use today — email lets us key Mongo users by
+  /// address and avoid dup accounts; profile gives us the display name
+  /// + avatar URL we render in the header.
+  static final _googleSignIn = GoogleSignIn(scopes: const ['email', 'profile']);
 
   /// Send an OTP SMS to [phoneNumber] (must be E.164: `+84...`).
   /// On Android the Play Integrity flow may auto-verify; in that case
@@ -95,9 +101,65 @@ class AuthService {
     }
   }
 
+  /// Sign out from BOTH providers. Skipping the Google side leaves a
+  /// stale token cached and the next `signIn()` returns the previous
+  /// account without showing the picker.
   static Future<void> signOut() async {
     _verificationId = null;
-    await _auth.signOut();
+    await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
+  }
+
+  /// Trigger the native Google account picker → exchange the resulting
+  /// id/access tokens for a Firebase credential → sign into Firebase.
+  /// Returns the picked email + display name + photo so the caller can
+  /// upsert into Mongo.
+  static Future<AuthGoogleResult> signInWithGoogle() async {
+    try {
+      final googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        return AuthGoogleResult.error('Đã hủy đăng nhập');
+      }
+
+      final googleAuth = await googleUser.authentication;
+      final credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      final userCredential = await _auth.signInWithCredential(credential);
+      final user = userCredential.user;
+      if (user == null) {
+        return AuthGoogleResult.error('Đăng nhập Firebase thất bại');
+      }
+
+      return AuthGoogleResult.success(
+        firebaseUid: user.uid,
+        email: user.email ?? googleUser.email,
+        displayName: user.displayName ?? googleUser.displayName ?? 'Người dùng',
+        photoUrl: user.photoURL ?? googleUser.photoUrl,
+      );
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[auth-google] FirebaseAuthException: ${e.code}');
+      return AuthGoogleResult.error(_mapGoogleError(e));
+    } catch (e) {
+      debugPrint('[auth-google] error: $e');
+      return AuthGoogleResult.error('Lỗi không xác định: $e');
+    }
+  }
+
+  static String _mapGoogleError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'account-exists-with-different-credential':
+        return 'Email này đã đăng ký bằng cách khác';
+      case 'invalid-credential':
+        return 'Thông tin đăng nhập không hợp lệ';
+      case 'network-request-failed':
+        return 'Lỗi mạng, vui lòng thử lại';
+      case 'user-disabled':
+        return 'Tài khoản đã bị khóa';
+      default:
+        return 'Lỗi: ${e.message ?? e.code}';
+    }
   }
 
   static User? get currentUser => _auth.currentUser;
@@ -176,4 +238,38 @@ class AuthVerifyResult {
 
   factory AuthVerifyResult.error(String msg) =>
       AuthVerifyResult._(isSuccess: false, error: msg);
+}
+
+class AuthGoogleResult {
+  const AuthGoogleResult._({
+    required this.isSuccess,
+    this.firebaseUid,
+    this.email,
+    this.displayName,
+    this.photoUrl,
+    this.error,
+  });
+
+  final bool isSuccess;
+  final String? firebaseUid;
+  final String? email;
+  final String? displayName;
+  final String? photoUrl;
+  final String? error;
+
+  factory AuthGoogleResult.success({
+    required String firebaseUid,
+    required String email,
+    required String displayName,
+    String? photoUrl,
+  }) => AuthGoogleResult._(
+    isSuccess: true,
+    firebaseUid: firebaseUid,
+    email: email,
+    displayName: displayName,
+    photoUrl: photoUrl,
+  );
+
+  factory AuthGoogleResult.error(String msg) =>
+      AuthGoogleResult._(isSuccess: false, error: msg);
 }
