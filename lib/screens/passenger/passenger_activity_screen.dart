@@ -332,7 +332,7 @@ class _TripCard extends StatelessWidget {
                 formatVnd(trip.price),
                 style: AppTypography.bodyLarge.copyWith(
                   color: AppColors.primary500,
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                 ),
               ),

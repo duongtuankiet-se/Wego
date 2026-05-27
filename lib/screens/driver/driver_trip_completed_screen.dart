@@ -100,7 +100,7 @@ class _DriverTripCompletedScreenState
                       style: AppTypography.display.copyWith(
                         color: AppColors.primary500,
                         fontFamily: 'monospace',
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                       ),
                     ),
                     const SizedBox(height: 6),

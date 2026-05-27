@@ -75,7 +75,7 @@ class DriverProfileScreen extends ConsumerWidget {
                       'TÀI XẾ KIM CƯƠNG',
                       style: TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 11,
                         letterSpacing: 2.0,
                       ),

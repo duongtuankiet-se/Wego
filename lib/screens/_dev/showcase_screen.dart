@@ -119,7 +119,7 @@ class _ColorsGrid extends StatelessWidget {
 }
 
 class _TypographyDemo extends StatelessWidget {
-  final entries = const [
+  final entries = [
     ('display', AppTypography.display),
     ('h1', AppTypography.h1),
     ('h2', AppTypography.h2),

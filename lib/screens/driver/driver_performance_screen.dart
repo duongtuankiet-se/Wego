@@ -117,14 +117,15 @@ class _LevelCard extends StatelessWidget {
                 end: Alignment.centerRight,
               ),
             ),
-            child: const Center(
+            child: Center(
               child: Text(
                 'TÀI XẾ KIM CƯƠNG',
-                style: TextStyle(
+                style: AppTypography.micro.copyWith(
                   color: Colors.white,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                  letterSpacing: 2.0,
+                  // Heavy tracking is fine on uppercase Latin (no
+                  // diacritic collision here — VI uppercase still
+                  // breathes at 1.4 because there are no accents).
+                  letterSpacing: 1.4,
                 ),
               ),
             ),
@@ -149,7 +150,7 @@ class _LevelCard extends StatelessWidget {
                             name,
                             style: AppTypography.bodyLarge.copyWith(
                               color: AppColors.ink900,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

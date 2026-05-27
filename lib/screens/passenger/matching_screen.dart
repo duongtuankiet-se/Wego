@@ -310,7 +310,7 @@ class _MatchingScreenState extends ConsumerState<MatchingScreen>
                           formatVnd(price),
                           style: AppTypography.h2.copyWith(
                             color: AppColors.primary500,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w700,
                             fontFamily: 'monospace',
                             fontFeatures: const [FontFeature.tabularFigures()],
                           ),

@@ -91,7 +91,7 @@ class WgServiceCard extends StatelessWidget {
                     title,
                     style: AppTypography.h3.copyWith(
                       color: iconColor,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,

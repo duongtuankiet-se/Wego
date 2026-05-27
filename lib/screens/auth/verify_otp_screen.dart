@@ -199,7 +199,7 @@ class _VerifyOtpScreenState extends ConsumerState<VerifyOtpScreen> {
                   borderWidth: 1.5,
                 ),
                 textStyle: AppTypography.h2.copyWith(
-                  fontWeight: FontWeight.w800,
+                  fontWeight: FontWeight.w700,
                   color: AppColors.ink900,
                 ),
                 cursorColor: AppColors.primary500,

@@ -107,7 +107,7 @@ class _PromoCard extends StatelessWidget {
                         promo.title,
                         style: AppTypography.bodyLarge.copyWith(
                           color: Colors.white,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -140,7 +140,7 @@ class _PromoCard extends StatelessWidget {
                         promo.code,
                         style: AppTypography.body.copyWith(
                           color: AppColors.ink900,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                           fontFamily: 'monospace',
                           letterSpacing: 1.4,
                         ),
