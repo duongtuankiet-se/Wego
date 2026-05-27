@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:freezed_annotation/freezed_annotation.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
@@ -77,8 +79,17 @@ class ScheduleRideForm extends _$ScheduleRideForm {
   /// user changes pickup/dropoff faster than the Directions API replies.
   int _recalcToken = 0;
 
+  /// Phase 5M: 800ms debounce on the Directions API call so rapid
+  /// pickup→dropoff edits collapse into a single network round-trip.
+  /// Defense in depth alongside [_recalcToken] — the token guards
+  /// against late responses, the timer guards against ever firing them.
+  Timer? _recalcDebouncer;
+
   @override
-  ScheduleRideFormState build() => const ScheduleRideFormState();
+  ScheduleRideFormState build() {
+    ref.onDispose(() => _recalcDebouncer?.cancel());
+    return const ScheduleRideFormState();
+  }
 
   void setPickup(ScheduledTripLocation? loc) {
     state = state.copyWith(pickup: loc);
@@ -151,6 +162,7 @@ class ScheduleRideForm extends _$ScheduleRideForm {
   }
 
   void reset() {
+    _recalcDebouncer?.cancel();
     state = const ScheduleRideFormState();
   }
 
@@ -179,10 +191,23 @@ class ScheduleRideForm extends _$ScheduleRideForm {
     );
   }
 
+  /// Schedules a debounced fare recalc. Subsequent calls within 800ms
+  /// supersede each other so the Directions API only fires once after
+  /// the user stops editing pickup/dropoff.
+  void _scheduleRecalc() {
+    if (state.pickup == null || state.dropoff == null) return;
+    _recalcDebouncer?.cancel();
+    _recalcDebouncer = Timer(
+      const Duration(milliseconds: 800),
+      _doRecalcFare,
+    );
+  }
+
   /// Full recalc: hits the Directions API to refresh distance/duration
-  /// then folds the result into the fare. Debounced by [_recalcToken]
-  /// so stale responses can't overwrite a newer one.
-  Future<void> _scheduleRecalc() async {
+  /// then folds the result into the fare. Stale responses are dropped
+  /// via [_recalcToken] in case a newer call already superseded us
+  /// (network jitter / multiple debouncer firings).
+  Future<void> _doRecalcFare() async {
     final s = state;
     if (s.pickup == null || s.dropoff == null) return;
 
