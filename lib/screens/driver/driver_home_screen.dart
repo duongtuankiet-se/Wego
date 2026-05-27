@@ -19,6 +19,7 @@ import '../../core/widgets/wg_incentive_card.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_hotspots.dart';
 import '../../models/driver.dart';
+import '../../models/scheduled_trip.dart';
 import '../../models/trip.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/driver_provider.dart';
@@ -26,6 +27,8 @@ import '../../providers/driver_status_provider.dart';
 import '../../providers/earnings_provider.dart';
 import '../../providers/incoming_trip_provider.dart';
 import '../../providers/location_provider.dart';
+import '../../providers/notifications_provider.dart';
+import '../../providers/scheduled_trips_provider.dart';
 import '../../providers/trip_service_provider.dart';
 import '_widgets/driver_stats_strip.dart';
 import '_widgets/incoming_trip_modal.dart';
@@ -154,7 +157,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             top: mq.padding.top + 12,
             left: 16,
             right: 16,
-            child: _TopHeader(driver: driverAsync.valueOrNull),
+            child: _TopHeader(
+              driver: driverAsync.valueOrNull,
+              unreadNotifications: ref.watch(unreadNotificationCountProvider),
+              onBellTap: () => context.push('/notifications'),
+            ),
           ),
           Positioned(
             top: mq.padding.top + 84,
@@ -182,8 +189,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
             maxChildSize: maxSize,
             snap: true,
             snapSizes: snapSizes,
-            builder: (context, sc) =>
-                _Panel(scrollController: sc, statsAsync: statsAsync),
+            builder: (context, sc) => _Panel(
+              scrollController: sc,
+              statsAsync: statsAsync,
+              driverId: driverAsync.valueOrNull?.id,
+            ),
           ),
         ],
       ),
@@ -266,8 +276,14 @@ class _MapBodyState extends State<_MapBody> {
 }
 
 class _TopHeader extends StatelessWidget {
-  const _TopHeader({required this.driver});
+  const _TopHeader({
+    required this.driver,
+    required this.unreadNotifications,
+    required this.onBellTap,
+  });
   final Driver? driver;
+  final int unreadNotifications;
+  final VoidCallback onBellTap;
 
   @override
   Widget build(BuildContext context) {
@@ -317,8 +333,8 @@ class _TopHeader extends StatelessWidget {
         const SizedBox(width: 10),
         _GlassIcon(
           icon: PhosphorIconsRegular.bell,
-          hasDot: true,
-          onTap: () => WgToast.info(context, 'Chưa có thông báo mới'),
+          hasDot: unreadNotifications > 0,
+          onTap: onBellTap,
         ),
       ],
     );
@@ -499,9 +515,14 @@ class _RecenterFab extends StatelessWidget {
 }
 
 class _Panel extends ConsumerWidget {
-  const _Panel({required this.scrollController, required this.statsAsync});
+  const _Panel({
+    required this.scrollController,
+    required this.statsAsync,
+    required this.driverId,
+  });
   final ScrollController scrollController;
   final AsyncValue statsAsync;
+  final String? driverId;
 
   String _short(int vnd) {
     if (vnd == 0) return '0đ';
@@ -574,6 +595,14 @@ class _Panel extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           const _HotspotHorizontalList(),
+          const SizedBox(height: 18),
+          _SectionHeader(
+            icon: PhosphorIconsFill.calendarPlus,
+            iconColor: AppColors.sharedAccent,
+            title: 'Chuyến sắp tới',
+          ),
+          const SizedBox(height: 10),
+          _ScheduledTripsList(driverId: driverId),
           const SizedBox(height: 18),
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -719,12 +748,16 @@ class _HotspotMiniCard extends StatelessWidget {
                 Expanded(
                   child: Text(
                     hotspot.shortLabel,
+                    // Phase 5J: w700 + maxLines:1 caused VN diacritics (e.g.
+                    // "Sân bay") to drop the â accent on Android system-font
+                    // fallback. Cap at w600 + allow 2 lines so the accent
+                    // never sits flush against the maxWidth boundary.
                     style: AppTypography.body.copyWith(
                       color: AppColors.ink900,
-                      fontWeight: FontWeight.w700,
+                      fontWeight: FontWeight.w600,
                       fontSize: 14,
                     ),
-                    maxLines: 1,
+                    maxLines: 2,
                     overflow: TextOverflow.ellipsis,
                   ),
                 ),
@@ -756,6 +789,221 @@ class _HotspotMiniCard extends StatelessWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+class _ScheduledTripsList extends ConsumerWidget {
+  const _ScheduledTripsList({required this.driverId});
+  final String? driverId;
+
+  Future<void> _accept(
+    BuildContext context,
+    WidgetRef ref,
+    ScheduledTrip trip,
+  ) async {
+    if (driverId == null) {
+      WgToast.error(context, 'Đang tải thông tin tài xế…');
+      return;
+    }
+    final svc = ref.read(scheduledTripServiceProvider);
+    final ok = await svc.acceptScheduledTrip(
+      tripId: trip.id,
+      driverId: driverId!,
+    );
+    if (!context.mounted) return;
+    if (ok) {
+      ref.invalidate(driverUpcomingTripsProvider);
+      WgToast.success(context, 'Đã nhận chuyến ${trip.tripCode}');
+    } else {
+      WgToast.error(context, 'Chuyến đã bị tài xế khác nhận');
+      ref.invalidate(driverUpcomingTripsProvider);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tripsAsync = ref.watch(driverUpcomingTripsProvider);
+    return tripsAsync.when(
+      loading: () => const SizedBox(
+        height: 124,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+      error: (_, __) => Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        child: Text(
+          'Không tải được danh sách chuyến đặt trước',
+          style: AppTypography.caption.copyWith(color: AppColors.ink500),
+        ),
+      ),
+      data: (trips) {
+        if (trips.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.ink50,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: AppColors.ink200, style: BorderStyle.solid),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    PhosphorIconsRegular.calendarBlank,
+                    size: 22,
+                    color: AppColors.ink400,
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      'Chưa có chuyến nào sắp tới — quay lại sau nhé!',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          );
+        }
+        return SizedBox(
+          height: 168,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            itemCount: trips.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 10),
+            itemBuilder: (_, i) => _ScheduledTripMiniCard(
+              trip: trips[i],
+              onAccept: () => _accept(context, ref, trips[i]),
+            ),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _ScheduledTripMiniCard extends StatelessWidget {
+  const _ScheduledTripMiniCard({required this.trip, required this.onAccept});
+  final ScheduledTrip trip;
+  final VoidCallback onAccept;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 248,
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: AppColors.sharedAccent.withValues(alpha: 0.2)),
+        boxShadow: AppShadows.xs,
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppColors.sharedAccent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  trip.rideType == 'shared' ? 'XE GHÉP' : 'XE RIÊNG',
+                  style: AppTypography.micro.copyWith(
+                    color: AppColors.sharedAccent,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 9,
+                  ),
+                ),
+              ),
+              const Spacer(),
+              Text(
+                trip.countdownText,
+                style: AppTypography.micro.copyWith(
+                  color: AppColors.warning,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 6),
+          Text(
+            trip.scheduledAtVN,
+            style: AppTypography.caption.copyWith(
+              color: AppColors.ink900,
+              fontWeight: FontWeight.w700,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '${trip.pickup.name} → ${trip.dropoff.name}',
+            style: AppTypography.micro.copyWith(
+              color: AppColors.ink600,
+              fontSize: 11,
+            ),
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const Spacer(),
+          Row(
+            children: [
+              Text(
+                formatVnd(trip.estimatedFare),
+                style: AppTypography.body.copyWith(
+                  color: AppColors.primary600,
+                  fontWeight: FontWeight.w800,
+                  fontFamily: 'monospace',
+                  fontSize: 14,
+                ),
+              ),
+              const Spacer(),
+              SizedBox(
+                height: 32,
+                child: Material(
+                  color: AppColors.primary500,
+                  borderRadius: BorderRadius.circular(10),
+                  child: InkWell(
+                    onTap: () {
+                      HapticFeedback.lightImpact();
+                      onAccept();
+                    },
+                    borderRadius: BorderRadius.circular(10),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            'Nhận',
+                            style: AppTypography.caption.copyWith(
+                              color: AppColors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          const Icon(
+                            PhosphorIconsRegular.arrowRight,
+                            color: AppColors.white,
+                            size: 14,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
       ),
     );
   }

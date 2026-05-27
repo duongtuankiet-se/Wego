@@ -104,6 +104,13 @@ class _WgInputState extends State<WgInput> {
             validator: widget.validator,
             onChanged: widget.onChanged,
             onFieldSubmitted: widget.onSubmitted,
+            // VN IME hardening (Phase 5L): off for free-text variants so
+            // Telex/VNI composing diacritics don't get clobbered by the
+            // Samsung/Xiaomi keyboard. Phone/OTP/password don't compose.
+            autocorrect: widget.variant == WgInputVariant.text ? false : true,
+            enableSuggestions: widget.variant != WgInputVariant.text,
+            smartDashesType: SmartDashesType.disabled,
+            smartQuotesType: SmartQuotesType.disabled,
             decoration: InputDecoration(
               hintText: widget.hint,
               counterText: '',

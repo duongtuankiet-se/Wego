@@ -11,6 +11,18 @@ class PromoVoucher {
   final List<Color> gradient;
   final IconData icon;
 
+  /// Percent discount (0-100). When 0, [discountVnd] is used instead.
+  final int discountPercent;
+
+  /// Fixed VND discount. Null when [discountPercent] > 0.
+  final int? discountVnd;
+
+  /// Cap on percent discount (VND). Null = no cap.
+  final int? maxDiscountVnd;
+
+  /// Minimum base fare (VND) for the promo to apply.
+  final int minOrderVnd;
+
   const PromoVoucher({
     required this.code,
     required this.title,
@@ -18,6 +30,10 @@ class PromoVoucher {
     required this.expiresAt,
     required this.gradient,
     required this.icon,
+    this.discountPercent = 0,
+    this.discountVnd,
+    this.maxDiscountVnd,
+    this.minOrderVnd = 0,
   });
 }
 
@@ -32,6 +48,7 @@ List<PromoVoucher> generateMockPromos() {
       expiresAt: eoy,
       gradient: const [AppColors.primary500, AppColors.primary700],
       icon: PhosphorIconsRegular.confetti,
+      discountVnd: 20000,
     ),
     PromoVoucher(
       code: 'HOLIDAY30',
@@ -40,6 +57,9 @@ List<PromoVoucher> generateMockPromos() {
       expiresAt: midYear,
       gradient: const [Color(0xFFEF4444), Color(0xFFC2410C)],
       icon: PhosphorIconsRegular.couch,
+      discountPercent: 30,
+      maxDiscountVnd: 30000,
+      minOrderVnd: 40000,
     ),
     PromoVoucher(
       code: 'SUMMER100',
@@ -48,6 +68,8 @@ List<PromoVoucher> generateMockPromos() {
       expiresAt: midYear,
       gradient: const [Color(0xFFF59E0B), Color(0xFFB45309)],
       icon: PhosphorIconsRegular.umbrella,
+      discountVnd: 100000,
+      minOrderVnd: 200000,
     ),
     PromoVoucher(
       code: 'AIRPORT15',
@@ -56,6 +78,9 @@ List<PromoVoucher> generateMockPromos() {
       expiresAt: eoy,
       gradient: const [AppColors.sharedAccent, Color(0xFF0E7490)],
       icon: PhosphorIconsFill.airplaneTakeoff,
+      discountPercent: 15,
+      maxDiscountVnd: 25000,
+      minOrderVnd: 50000,
     ),
     PromoVoucher(
       code: 'SHARE38',
@@ -72,6 +97,29 @@ List<PromoVoucher> generateMockPromos() {
       expiresAt: eoy,
       gradient: const [Color(0xFFD4A574), Color(0xFF8B6F47)],
       icon: PhosphorIconsRegular.gift,
+    ),
+    // ── Phase 5I scheduled-ride promos ──────────────────────────────
+    PromoVoucher(
+      code: 'CARPOOL30',
+      title: 'Giảm 30% xe ghép đặt trước',
+      description: 'Áp dụng cho chuyến Xe ghép đặt lịch — tối đa 30k',
+      expiresAt: eoy,
+      gradient: const [Color(0xFF0EA5E9), AppColors.sharedAccent],
+      icon: PhosphorIconsFill.calendarPlus,
+      discountPercent: 30,
+      maxDiscountVnd: 30000,
+      minOrderVnd: 60000,
+    ),
+    PromoVoucher(
+      code: 'FIRSTRIDE10',
+      title: 'Giảm 10% chuyến đầu đặt trước',
+      description: 'Cho lần đầu dùng tính năng đặt trước, tối đa 20k',
+      expiresAt: eoy,
+      gradient: const [AppColors.primary400, AppColors.primary600],
+      icon: PhosphorIconsFill.sparkle,
+      discountPercent: 10,
+      maxDiscountVnd: 20000,
+      minOrderVnd: 50000,
     ),
   ];
 }

@@ -10,7 +10,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
-import '../../core/utils/vietnamese_text_controller.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/default_saved_places.dart';
 import '../../models/place.dart';
@@ -31,7 +30,7 @@ class PassengerSearchScreen extends ConsumerStatefulWidget {
 }
 
 class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
-  final _dropoffCtrl = VietnameseTextController();
+  final _dropoffCtrl = TextEditingController();
   Timer? _debounce;
   List<PlaceSuggestion> _apiSuggestions = const [];
   bool _apiLoading = false;
@@ -49,7 +48,7 @@ class _PassengerSearchScreenState extends ConsumerState<PassengerSearchScreen> {
     // finalize composing diacritics before we read the controller text.
     _debounce = Timer(const Duration(milliseconds: 600), () async {
       if (!mounted) return;
-      final query = _dropoffCtrl.committedText.trim();
+      final query = _dropoffCtrl.text.trim();
       ref.read(searchQueryProvider.notifier).setQuery(query);
       if (query.length < 2) {
         setState(() => _apiSuggestions = const []);

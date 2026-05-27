@@ -97,6 +97,8 @@ class MongoService {
       (await getDb()).collection(Collections.trips);
   Future<DbCollection> ratings() async =>
       (await getDb()).collection(Collections.ratings);
+  Future<DbCollection> scheduledTrips() async =>
+      (await getDb()).collection(Collections.scheduledTrips);
 
   Future<void> close() async {
     try {
@@ -138,6 +140,25 @@ class MongoService {
         .createIndex(
           keys: {'driver_id': 1, 'created_at': -1},
           name: 'idx_trips_driver_created',
+        );
+    // ── Phase 5I scheduled trips ──────────────────────────────────
+    await db
+        .collection(Collections.scheduledTrips)
+        .createIndex(
+          keys: {'passenger_id': 1, 'scheduled_at': -1},
+          name: 'idx_sched_passenger_time',
+        );
+    await db
+        .collection(Collections.scheduledTrips)
+        .createIndex(
+          keys: {'status': 1, 'scheduled_at': 1},
+          name: 'idx_sched_status_time',
+        );
+    await db
+        .collection(Collections.scheduledTrips)
+        .createIndex(
+          keys: {'driver_id': 1, 'status': 1},
+          name: 'idx_sched_driver_status',
         );
   }
 }

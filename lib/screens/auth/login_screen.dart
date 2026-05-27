@@ -13,6 +13,7 @@ import '../../core/widgets/wg_toast.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '_widgets/auth_header.dart';
+import '_widgets/google_sign_in_button.dart';
 
 /// Login (Phase 5D phone-only + Phase 5H Google). For accounts already
 /// in Mongo, name + role come from the stored doc. Google sign-in
@@ -134,7 +135,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                 const SizedBox(height: 24),
                 const _OrDivider(),
                 const SizedBox(height: 16),
-                _GoogleSignInButton(
+                GoogleSignInButton(
                   loading: _googleLoading,
                   enabled: !anyLoading,
                   onPressed: _handleGoogle,
@@ -194,88 +195,3 @@ class _OrDivider extends StatelessWidget {
   }
 }
 
-/// Outlined Google sign-in button. WgButton doesn't have an outlined
-/// variant + custom-child slot, so we build it inline. The "G" inside
-/// the white circle is a typographic fallback for the official PNG —
-/// keeps the bundle small + still on-brand at a glance.
-class _GoogleSignInButton extends StatelessWidget {
-  const _GoogleSignInButton({
-    required this.loading,
-    required this.enabled,
-    required this.onPressed,
-  });
-
-  final bool loading;
-  final bool enabled;
-  final VoidCallback onPressed;
-
-  static const _googleBlue = Color(0xFF4285F4);
-
-  @override
-  Widget build(BuildContext context) {
-    return SizedBox(
-      width: double.infinity,
-      height: 56,
-      child: Opacity(
-        opacity: enabled ? 1 : 0.5,
-        child: Material(
-          color: AppColors.white,
-          borderRadius: BorderRadius.circular(16),
-          child: InkWell(
-            onTap: enabled && !loading ? onPressed : null,
-            borderRadius: BorderRadius.circular(16),
-            child: Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(color: AppColors.ink200, width: 1),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  if (loading)
-                    const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(_googleBlue),
-                      ),
-                    )
-                  else ...[
-                    Container(
-                      width: 22,
-                      height: 22,
-                      decoration: BoxDecoration(
-                        color: AppColors.white,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: AppColors.ink200, width: 1),
-                      ),
-                      alignment: Alignment.center,
-                      child: const Text(
-                        'G',
-                        style: TextStyle(
-                          color: _googleBlue,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 14,
-                          height: 1,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Text(
-                      'Đăng nhập với Google',
-                      style: AppTypography.bodyLarge.copyWith(
-                        color: AppColors.ink900,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
