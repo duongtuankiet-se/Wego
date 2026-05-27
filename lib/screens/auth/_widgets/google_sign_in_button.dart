@@ -3,6 +3,11 @@ import 'package:flutter/material.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../core/widgets/google_g_logo.dart';
 
+/// Path to the official Google G logo PNG (4-color, 1771 bytes) shipped
+/// with the app. Kept as a top-level const so the [Image.asset]
+/// errorBuilder fallback can reference the same string.
+const _googleLogoAsset = 'assets/icons/g-logo.png';
+
 /// Material-Guidelines compliant Google sign-in button:
 /// white background, 1px #DADCE0 border (Google's official spec), 4-color
 /// G logo, and Roboto Medium label "Tiếp tục với Google". Shared between
@@ -62,7 +67,16 @@ class GoogleSignInButton extends StatelessWidget {
                       ),
                     )
                   else ...[
-                    const GoogleGLogo(size: 22),
+                    // Phase 5M: switched from CustomPainter to the official
+                    // brand PNG. The painter rendered like a Chrome spinner
+                    // on some devices. Fall back to GoogleGLogo if the asset
+                    // ever goes missing so the button never collapses.
+                    Image.asset(
+                      _googleLogoAsset,
+                      width: 22,
+                      height: 22,
+                      errorBuilder: (_, _, _) => const GoogleGLogo(size: 22),
+                    ),
                     const SizedBox(width: 12),
                     Text(
                       label,

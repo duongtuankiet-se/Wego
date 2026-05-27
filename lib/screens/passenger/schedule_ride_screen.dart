@@ -583,59 +583,65 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
   }
 
   Widget _buildPassengerLuggageRow(ScheduleRideFormState form) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Expanded(
-          child: InkWell(
-            onTap: _showPassengerPicker,
-            borderRadius: AppRadius.card,
-            child: _CardShell(
-              title: 'Hành khách',
-              icon: PhosphorIconsFill.user,
-              iconColor: AppColors.primary500,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${form.passengerCount} người',
-                    style: AppTypography.h3.copyWith(
-                      fontWeight: FontWeight.w700,
-                      color: AppColors.ink900,
+    // IntrinsicHeight is required because ListView gives this Row
+    // unbounded vertical space — without it, CrossAxisAlignment.stretch
+    // assigns infinite height to the Expanded cards, which crashes the
+    // Wrap inside the Luggage card with "RenderBox no size".
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Expanded(
+            child: InkWell(
+              onTap: _showPassengerPicker,
+              borderRadius: AppRadius.card,
+              child: _CardShell(
+                title: 'Hành khách',
+                icon: PhosphorIconsFill.user,
+                iconColor: AppColors.primary500,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text(
+                      '${form.passengerCount} người',
+                      style: AppTypography.h3.copyWith(
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.ink900,
+                      ),
                     ),
-                  ),
-                  const Icon(
-                    PhosphorIconsRegular.caretRight,
-                    size: 16,
-                    color: AppColors.ink400,
-                  ),
-                ],
+                    const Icon(
+                      PhosphorIconsRegular.caretRight,
+                      size: 16,
+                      color: AppColors.ink400,
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: _CardShell(
-            title: 'Hành lý',
-            icon: PhosphorIconsFill.suitcase,
-            iconColor: AppColors.primary500,
-            child: Wrap(
-              spacing: 6,
-              runSpacing: 6,
-              children: LuggageType.values.map((l) {
-                return _SmallPill(
-                  label: _luggageLabel(l),
-                  selected: form.luggage == l,
-                  onTap: () => ref
-                      .read(scheduleRideFormProvider.notifier)
-                      .setLuggage(l),
-                );
-              }).toList(growable: false),
+          const SizedBox(width: 12),
+          Expanded(
+            child: _CardShell(
+              title: 'Hành lý',
+              icon: PhosphorIconsFill.suitcase,
+              iconColor: AppColors.primary500,
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                children: LuggageType.values.map((l) {
+                  return _SmallPill(
+                    label: _luggageLabel(l),
+                    selected: form.luggage == l,
+                    onTap: () => ref
+                        .read(scheduleRideFormProvider.notifier)
+                        .setLuggage(l),
+                  );
+                }).toList(growable: false),
+              ),
             ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -722,10 +728,14 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
                   children: [
                     Icon(_paymentIcon(m), size: 20, color: _paymentColor(m)),
                     const SizedBox(width: 12),
-                    Text(
-                      _paymentLabel(m),
-                      style: AppTypography.body.copyWith(
-                        color: AppColors.ink900,
+                    Expanded(
+                      child: Text(
+                        _paymentLabel(m),
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.ink900,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
