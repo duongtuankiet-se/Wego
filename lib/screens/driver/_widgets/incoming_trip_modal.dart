@@ -384,7 +384,7 @@ class _MetricsRow extends StatelessWidget {
               formatVnd(price),
               style: AppTypography.bodyLarge.copyWith(
                 color: AppColors.primary500,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),

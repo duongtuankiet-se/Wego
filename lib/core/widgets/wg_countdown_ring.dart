@@ -51,7 +51,7 @@ class WgCountdownRing extends StatelessWidget {
             '$secondsLeft',
             style: AppTypography.body.copyWith(
               color: urgent ? AppColors.danger : color,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               fontFamily: 'monospace',
             ),
           ),

@@ -71,7 +71,7 @@ class NavigationInstructionCard extends StatelessWidget {
                         instruction.streetName,
                         style: AppTypography.bodyLarge.copyWith(
                           color: AppColors.ink900,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w700,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,

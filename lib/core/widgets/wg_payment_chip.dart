@@ -71,7 +71,7 @@ class WgPaymentChip extends StatelessWidget {
                       brandLetter!,
                       style: const TextStyle(
                         color: Colors.white,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w700,
                         fontSize: 16,
                       ),
                     ),

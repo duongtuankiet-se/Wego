@@ -566,7 +566,7 @@ class _SosButton extends StatelessWidget {
           style: TextStyle(
             color: AppColors.danger,
             fontSize: 11,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
           ),
         ),
       ],

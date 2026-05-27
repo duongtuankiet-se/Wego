@@ -7,7 +7,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
-import 'package:sliding_up_panel/sliding_up_panel.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_shadows.dart';
@@ -133,37 +132,24 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
     });
 
     final mq = MediaQuery.of(context);
-    const panelMin = 96.0;
-    final panelMax = mq.size.height * 0.72;
     final isOnline = statusAsync.valueOrNull == DriverStatus.online;
     final isDriverLoaded = driverAsync.valueOrNull != null;
+
+    // Snap positions are fractions of screen height — peek (25%) keeps
+    // the map nearly full-screen, the comfortable stop (55%) reveals
+    // earnings + hotspots, and 85% expands the full scroll content.
+    const minSize = 0.25;
+    const initialSize = 0.3;
+    const snapSizes = <double>[minSize, initialSize, 0.55, 0.85];
+    const maxSize = 0.85;
+
+    final peekPx = mq.size.height * initialSize;
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
       body: Stack(
         children: [
-          SlidingUpPanel(
-            minHeight: panelMin,
-            maxHeight: panelMax,
-            defaultPanelState: PanelState.CLOSED,
-            snapPoint: 0.5,
-            parallaxEnabled: true,
-            parallaxOffset: 0.4,
-            color: AppColors.white,
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
-            backdropEnabled: true,
-            backdropOpacity: 0.2,
-            boxShadow: const [
-              BoxShadow(
-                blurRadius: 24,
-                color: Color(0x1F000000),
-                offset: Offset(0, -4),
-              ),
-            ],
-            panelBuilder: (sc) =>
-                _Panel(scrollController: sc, statsAsync: statsAsync),
-            body: _MapBody(onMapCreated: (c) => _map = c, driverPos: loc),
-          ),
+          _MapBody(onMapCreated: (c) => _map = c, driverPos: loc),
           Positioned(
             top: mq.padding.top + 12,
             left: 16,
@@ -182,13 +168,22 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
           ),
           Positioned(
             right: 16,
-            bottom: panelMin + 16,
+            bottom: peekPx + 16,
             child: _RecenterFab(
               onTap: () {
                 HapticFeedback.mediumImpact();
                 _map?.animateCamera(CameraUpdate.newLatLngZoom(loc, 14));
               },
             ),
+          ),
+          DraggableScrollableSheet(
+            initialChildSize: initialSize,
+            minChildSize: minSize,
+            maxChildSize: maxSize,
+            snap: true,
+            snapSizes: snapSizes,
+            builder: (context, sc) =>
+                _Panel(scrollController: sc, statsAsync: statsAsync),
           ),
         ],
       ),
@@ -436,7 +431,7 @@ class _StatusHeroCard extends StatelessWidget {
               isOnline ? 'Đang nhận chuyến' : 'Tạm nghỉ',
               style: AppTypography.h2.copyWith(
                 color: AppColors.ink900,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
               ),
               maxLines: 1,
               overflow: TextOverflow.ellipsis,
@@ -527,80 +522,94 @@ class _Panel extends ConsumerWidget {
     final stats = statsAsync.valueOrNull;
     final completedToday = stats?.tripCount ?? 0;
 
-    return ListView(
-      controller: scrollController,
-      padding: EdgeInsets.zero,
-      children: [
-        const SizedBox(height: 10),
-        Center(
-          child: Container(
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: AppColors.ink300,
-              borderRadius: BorderRadius.circular(2),
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(28)),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.ink900.withValues(alpha: 0.08),
+            blurRadius: 24,
+            offset: const Offset(0, -8),
+          ),
+        ],
+      ),
+      clipBehavior: Clip.antiAlias,
+      child: ListView(
+        controller: scrollController,
+        padding: EdgeInsets.zero,
+        children: [
+          const SizedBox(height: 10),
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.ink300,
+                borderRadius: BorderRadius.circular(2),
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 14),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: GestureDetector(
-            onTap: () => context.push('/driver/earnings'),
-            child: DriverStatsStrip(
-              earningsLabel: _short(stats?.earningsVnd ?? 0),
-              tripCount: stats?.tripCount ?? 0,
-              activeLabel: _duration(stats?.activeMinutes ?? 0),
-              rating: stats?.ratingAvg ?? 0.0,
+          const SizedBox(height: 14),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: GestureDetector(
+              onTap: () => context.push('/driver/earnings'),
+              child: DriverStatsStrip(
+                earningsLabel: _short(stats?.earningsVnd ?? 0),
+                tripCount: stats?.tripCount ?? 0,
+                activeLabel: _duration(stats?.activeMinutes ?? 0),
+                rating: stats?.ratingAvg ?? 0.0,
+              ),
             ),
           ),
-        ),
-        const SizedBox(height: 18),
-        _SectionHeader(
-          icon: PhosphorIconsFill.fire,
-          iconColor: AppColors.danger,
-          title: 'Khu vực đông khách',
-          trailing: 'Xem tất cả',
-          onTrailing: () =>
-              WgToast.info(context, 'Xem hotspot toàn thành phố sắp ra mắt'),
-        ),
-        const SizedBox(height: 10),
-        const _HotspotHorizontalList(),
-        const SizedBox(height: 18),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: WgIncentiveCard(
-            title: 'Thưởng chăm chỉ',
-            completed: completedToday,
-            target: 20,
-            rewardVnd: 200000,
+          const SizedBox(height: 18),
+          _SectionHeader(
+            icon: PhosphorIconsFill.fire,
+            iconColor: AppColors.danger,
+            title: 'Khu vực đông khách',
+            trailing: 'Xem tất cả',
+            onTrailing: () =>
+                WgToast.info(context, 'Xem hotspot toàn thành phố sắp ra mắt'),
           ),
-        ),
-        const SizedBox(height: 12),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          child: Row(
-            children: [
-              Expanded(
-                child: _ActionButton(
-                  icon: PhosphorIconsRegular.wallet,
-                  label: 'Ví',
-                  onTap: () => context.push('/driver/wallet'),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: _ActionButton(
-                  icon: PhosphorIconsRegular.trendUp,
-                  label: 'Hiệu suất',
-                  onTap: () => context.push('/driver/performance'),
-                ),
-              ),
-            ],
+          const SizedBox(height: 10),
+          const _HotspotHorizontalList(),
+          const SizedBox(height: 18),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: WgIncentiveCard(
+              title: 'Thưởng chăm chỉ',
+              completed: completedToday,
+              target: 20,
+              rewardVnd: 200000,
+            ),
           ),
-        ),
-        const SizedBox(height: 24),
-      ],
+          const SizedBox(height: 12),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    icon: PhosphorIconsRegular.wallet,
+                    label: 'Ví',
+                    onTap: () => context.push('/driver/wallet'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionButton(
+                    icon: PhosphorIconsRegular.trendUp,
+                    label: 'Hiệu suất',
+                    onTap: () => context.push('/driver/performance'),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+        ],
+      ),
     );
   }
 }
@@ -727,7 +736,7 @@ class _HotspotMiniCard extends StatelessWidget {
                   '${hotspot.activeRequests}',
                   style: AppTypography.h3.copyWith(
                     color: hotspot.heatColor,
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
                 ),
                 const SizedBox(width: 4),

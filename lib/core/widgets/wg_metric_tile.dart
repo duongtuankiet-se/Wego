@@ -38,7 +38,7 @@ class WgMetricTile extends StatelessWidget {
             value,
             style: AppTypography.h1.copyWith(
               color: AppColors.ink900,
-              fontWeight: FontWeight.w800,
+              fontWeight: FontWeight.w700,
               fontFamily: 'monospace',
               fontFeatures: const [FontFeature.tabularFigures()],
             ),

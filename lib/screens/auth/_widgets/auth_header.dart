@@ -35,7 +35,7 @@ class WgAuthHeader extends StatelessWidget {
         const SizedBox(height: 8),
         Text(
           title,
-          style: AppTypography.h1.copyWith(fontWeight: FontWeight.w800),
+          style: AppTypography.h1.copyWith(fontWeight: FontWeight.w700),
         ),
         const SizedBox(height: 6),
         subtitle,

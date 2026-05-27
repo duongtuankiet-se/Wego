@@ -609,7 +609,7 @@ class _SpeedLimitBadge extends StatelessWidget {
           '50',
           style: TextStyle(
             color: AppColors.danger,
-            fontWeight: FontWeight.w800,
+            fontWeight: FontWeight.w700,
             fontSize: 17,
             fontFamily: 'monospace',
           ),
@@ -745,7 +745,7 @@ class _BottomPanel extends StatelessWidget {
                     formatVnd(price),
                     style: AppTypography.bodyLarge.copyWith(
                       color: AppColors.primary500,
-                      fontWeight: FontWeight.w800,
+                      fontWeight: FontWeight.w700,
                       fontFamily: 'monospace',
                     ),
                   ),

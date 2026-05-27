@@ -178,7 +178,7 @@ class _BalanceCard extends StatelessWidget {
               style: AppTypography.display.copyWith(
                 color: AppColors.ink900,
                 fontSize: 34,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 fontFamily: 'monospace',
                 fontFeatures: const [FontFeature.tabularFigures()],
               ),
@@ -251,7 +251,7 @@ class _AccountCard extends StatelessWidget {
               brand,
               style: const TextStyle(
                 color: Colors.white,
-                fontWeight: FontWeight.w800,
+                fontWeight: FontWeight.w700,
                 fontSize: 18,
               ),
             ),
