@@ -16,6 +16,7 @@ import '../../core/widgets/wg_status_badge.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/scheduled_trip.dart';
 import '../../providers/scheduled_trips_provider.dart';
+import '_widgets/pool_tracking_card.dart';
 
 class ScheduleDetailScreen extends ConsumerStatefulWidget {
   const ScheduleDetailScreen({super.key, required this.tripId});
@@ -183,6 +184,10 @@ class _Body extends StatelessWidget {
           ),
           children: [
             _StatusHeader(trip: trip),
+            if (trip.poolId != null) ...[
+              const SizedBox(height: 12),
+              PoolTrackingCard(poolId: trip.poolId!),
+            ],
             const SizedBox(height: 12),
             _CodeRow(trip: trip, onCopy: onCopyCode),
             const SizedBox(height: 12),

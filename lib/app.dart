@@ -3,6 +3,7 @@ import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import 'core/theme/app_theme.dart';
+import 'providers/trip_pools_provider.dart';
 import 'router.dart';
 
 class WeGoApp extends ConsumerWidget {
@@ -11,6 +12,11 @@ class WeGoApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final router = ref.watch(routerProvider);
+    // Phase 5N: keep the pool auto-cancel sweeper alive for the
+    // lifetime of the app so abandoned pools get cleaned up while the
+    // user has the app open. The provider is keepAlive: true and self-
+    // disposes the underlying Timer.
+    ref.watch(poolAutoCancelJobProvider);
     return MaterialApp.router(
       title: 'WeGo',
       debugShowCheckedModeBanner: false,

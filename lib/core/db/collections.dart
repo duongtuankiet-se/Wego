@@ -7,4 +7,6 @@ class Collections {
   static const String trips = 'trips';
   static const String ratings = 'ratings';
   static const String scheduledTrips = 'scheduled_trips';
+  static const String driverVehicles = 'driver_vehicles';
+  static const String tripPools = 'trip_pools';
 }

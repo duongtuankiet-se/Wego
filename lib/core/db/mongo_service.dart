@@ -99,6 +99,10 @@ class MongoService {
       (await getDb()).collection(Collections.ratings);
   Future<DbCollection> scheduledTrips() async =>
       (await getDb()).collection(Collections.scheduledTrips);
+  Future<DbCollection> driverVehicles() async =>
+      (await getDb()).collection(Collections.driverVehicles);
+  Future<DbCollection> tripPools() async =>
+      (await getDb()).collection(Collections.tripPools);
 
   Future<void> close() async {
     try {
@@ -159,6 +163,43 @@ class MongoService {
         .createIndex(
           keys: {'driver_id': 1, 'status': 1},
           name: 'idx_sched_driver_status',
+        );
+    // ── Phase 5N carpool ─────────────────────────────────────────
+    await db
+        .collection(Collections.driverVehicles)
+        .createIndex(
+          keys: {'driver_id': 1, 'is_active': 1},
+          name: 'idx_driver_vehicles_driver_active',
+        );
+    await db
+        .collection(Collections.driverVehicles)
+        .createIndex(
+          keys: {'driver_id': 1, 'vehicle_plate': 1},
+          unique: true,
+          name: 'idx_driver_vehicles_plate_unique',
+        );
+    await db
+        .collection(Collections.tripPools)
+        .createIndex(
+          keys: {
+            'status': 1,
+            'dropoff_city': 1,
+            'dropoff_district': 1,
+            'scheduled_at': 1,
+          },
+          name: 'idx_pools_status_route_time',
+        );
+    await db
+        .collection(Collections.tripPools)
+        .createIndex(
+          keys: {'cancel_deadline': 1, 'status': 1},
+          name: 'idx_pools_cancel_deadline',
+        );
+    await db
+        .collection(Collections.tripPools)
+        .createIndex(
+          keys: {'driver_id': 1, 'status': 1},
+          name: 'idx_pools_driver_status',
         );
   }
 }

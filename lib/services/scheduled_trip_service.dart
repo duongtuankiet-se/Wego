@@ -5,6 +5,7 @@ import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where, modify;
 import '../core/db/mongo_service.dart';
 import '../data/mock_promos.dart';
 import '../models/scheduled_trip.dart';
+import 'trip_pool_service.dart';
 
 /// Result of [ScheduledTripService.validatePromo].
 class PromoValidation {
@@ -126,7 +127,29 @@ class ScheduledTripService {
 
     await col.insertOne(doc);
     developer.log('[sched] created $tripCode', name: 'sched');
-    return ScheduledTrip.fromMongo(doc);
+
+    var trip = ScheduledTrip.fromMongo(doc);
+
+    // Phase 5N: auto-pool if the customer opted into shared rides.
+    // Failures here are swallowed — the trip is already persisted, and
+    // we'd rather show the user a Single-rider confirmation than fail
+    // their booking because the pool engine hiccupped.
+    if (allowPooling) {
+      try {
+        final pool = await TripPoolService(_mongo).findOrCreatePool(trip);
+        developer.log('[sched] pool ${pool.poolCode}', name: 'sched');
+        final updated = await col.findOne(where.eq('_id', tripId));
+        if (updated != null) trip = ScheduledTrip.fromMongo(updated);
+      } catch (e, st) {
+        developer.log(
+          '[sched] pool assignment failed for $tripCode: $e',
+          name: 'sched',
+          error: e,
+          stackTrace: st,
+        );
+      }
+    }
+    return trip;
   }
 
   Map<String, dynamic> _locationToMongo(ScheduledTripLocation l) => {
