@@ -4,7 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where;
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
@@ -13,6 +13,7 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/widgets/wg_chip.dart';
 import '../../core/widgets/wg_toast.dart';
+import '../../core/widgets/wg_trackasia_map.dart';
 import '../../models/trip.dart';
 import '../../providers/current_trip_provider.dart';
 import '../../providers/mongo_provider.dart';
@@ -38,7 +39,7 @@ enum _LivePhase {
 
 class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     with TickerProviderStateMixin {
-  GoogleMapController? _map;
+  MapLibreMapController? _map;
   late final AnimationController _carAnim;
   Timer? _phaseTimer;
   _LivePhase _phase = _LivePhase.driverArriving;
@@ -143,8 +144,16 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
         lngs.reduce((a, b) => a > b ? a : b),
       ),
     );
-    Future.delayed(const Duration(milliseconds: 350), () {
-      _map?.animateCamera(CameraUpdate.newLatLngBounds(bounds, 80));
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      _map?.animateCamera(
+        CameraUpdate.newLatLngBounds(
+          bounds,
+          left: 80,
+          right: 80,
+          top: 80,
+          bottom: 80,
+        ),
+      );
     });
   }
 
@@ -288,7 +297,7 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
     _carAnim
       ..removeListener(_updateCar)
       ..dispose();
-    _map?.dispose();
+    // MapLibreMapController is owned by the widget tree.
     super.dispose();
   }
 
@@ -416,7 +425,10 @@ class _LiveTripScreenState extends ConsumerState<LiveTripScreen>
   }
 }
 
-class _MapBody extends StatelessWidget {
+/// TrackAsia map for the live trip. Pickup/dropoff render as static
+/// colored circles; the driver/car circle is tracked + relocated on
+/// every animation tick by reading [carPos] from `didUpdateWidget`.
+class _MapBody extends StatefulWidget {
   const _MapBody({
     required this.onMapCreated,
     required this.pickup,
@@ -425,52 +437,97 @@ class _MapBody extends StatelessWidget {
     required this.routePoints,
   });
 
-  final ValueChanged<GoogleMapController> onMapCreated;
+  final ValueChanged<MapLibreMapController> onMapCreated;
   final LatLng pickup;
   final LatLng dropoff;
   final LatLng carPos;
   final List<LatLng> routePoints;
 
   @override
+  State<_MapBody> createState() => _MapBodyState();
+}
+
+class _MapBodyState extends State<_MapBody> {
+  MapLibreMapController? _ctrl;
+  Circle? _carCircle;
+  Line? _routeLine;
+  bool _styleReady = false;
+
+  @override
+  void didUpdateWidget(_MapBody old) {
+    super.didUpdateWidget(old);
+    final ctrl = _ctrl;
+    if (!_styleReady || ctrl == null) return;
+    if (old.carPos != widget.carPos && _carCircle != null) {
+      ctrl.updateCircle(_carCircle!, CircleOptions(geometry: widget.carPos));
+    }
+    if (!_listEqual(old.routePoints, widget.routePoints) &&
+        _routeLine != null) {
+      ctrl.updateLine(_routeLine!, LineOptions(geometry: widget.routePoints));
+    }
+  }
+
+  bool _listEqual(List<LatLng> a, List<LatLng> b) {
+    if (a.length != b.length) return false;
+    for (var i = 0; i < a.length; i++) {
+      if (a[i] != b[i]) return false;
+    }
+    return true;
+  }
+
+  Future<void> _onStyleLoaded() async {
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    _routeLine = await ctrl.addLine(
+      LineOptions(
+        geometry: widget.routePoints,
+        lineColor: '#0FB67E',
+        lineWidth: 5,
+        lineJoin: 'round',
+      ),
+    );
+    await ctrl.addCircle(
+      CircleOptions(
+        geometry: widget.pickup,
+        circleRadius: 8,
+        circleColor: '#10B981',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2.5,
+      ),
+    );
+    await ctrl.addCircle(
+      CircleOptions(
+        geometry: widget.dropoff,
+        circleRadius: 8,
+        circleColor: '#EF4444',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 2.5,
+      ),
+    );
+    _carCircle = await ctrl.addCircle(
+      CircleOptions(
+        geometry: widget.carPos,
+        circleRadius: 9,
+        circleColor: '#0FB67E',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 3,
+      ),
+    );
+    _styleReady = true;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: pickup, zoom: 14),
-      onMapCreated: onMapCreated,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
+    return WgTrackAsiaMap(
+      initialCenter: widget.pickup,
+      initialZoom: 14,
+      onMapCreated: (c) {
+        _ctrl = c;
+        widget.onMapCreated(c);
+      },
+      onStyleLoadedCallback: _onStyleLoaded,
       rotateGesturesEnabled: false,
       tiltGesturesEnabled: false,
-      polylines: <Polyline>{
-        Polyline(
-          polylineId: const PolylineId('route'),
-          points: routePoints,
-          color: AppColors.primary500,
-          width: 5,
-        ),
-      },
-      markers: <Marker>{
-        Marker(
-          markerId: const MarkerId('pickup'),
-          position: pickup,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueGreen,
-          ),
-        ),
-        Marker(
-          markerId: const MarkerId('dropoff'),
-          position: dropoff,
-          icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
-        ),
-        Marker(
-          markerId: const MarkerId('driver'),
-          position: carPos,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-          rotation: 0,
-        ),
-      },
     );
   }
 }

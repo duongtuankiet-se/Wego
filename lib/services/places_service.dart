@@ -8,13 +8,6 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../core/env.dart';
 import '../core/theme/app_colors.dart';
 
-/// Đà Nẵng city center — used as the location bias for autocomplete so
-/// nearby POIs surface first. 30km radius covers everything from the
-/// airport to Hội An and Bà Nà.
-const _kDanangBiasLat = 16.0544;
-const _kDanangBiasLng = 108.2022;
-const _kDanangBiasRadiusMeters = 30000;
-
 class PlaceSuggestion {
   final String placeId;
   final String mainText;
@@ -77,8 +70,6 @@ class PlaceSuggestion {
     return PhosphorIconsFill.mapPin;
   }
 
-  /// Tint colour matched to [displayIcon] — drives both the icon and
-  /// the surrounding tinted tile.
   Color get displayIconColor {
     if (types.contains('airport') ||
         types.contains('bus_station') ||
@@ -129,37 +120,35 @@ class PlaceDetails {
   });
 }
 
-/// Thin wrapper over Places API "autocomplete" + "details" endpoints.
-/// All requests bias toward Vietnam (`components=country:vn`, `language=vi`).
+/// **TrackAsia v2** wrapper for autocomplete / details / reverse-geocoding.
+///
+/// Endpoints (all Google-compatible response shape):
+///   - `/api/v2/place/autocomplete/json`  → `predictions[]`
+///   - `/api/v2/place/details/json?place_id=...`  → `result.geometry.location`
+///   - `/api/v2/geocode/json?latlng=lat,lng`  → `results[0].formatted_address`
+///
+/// `new_admin=true` requests the 1/7/2025 administrative boundary
+/// reform for every call.
 class PlacesService {
   PlacesService._();
 
-  static const _autocompleteUrl =
-      'https://maps.googleapis.com/maps/api/place/autocomplete/json';
-  static const _detailsUrl =
-      'https://maps.googleapis.com/maps/api/place/details/json';
-  static const _geocodeUrl =
-      'https://maps.googleapis.com/maps/api/geocode/json';
+  static const _autocompletePath = '/api/v2/place/autocomplete/json';
+  static const _detailsPath = '/api/v2/place/details/json';
+  static const _geocodePath = '/api/v2/geocode/json';
 
   static Future<List<PlaceSuggestion>> autocomplete(String input) async {
     if (input.trim().length < 2) return const [];
-    if (!Env.hasGoogleMapsKey) return const [];
-    // Legacy Places Autocomplete supports a circular location bias via
-    // `location` + `radius` (returns `distance_meters` per result) and
-    // a `types[]` array on every prediction we can map to a Phosphor
-    // icon. Skipping `types=` filter on the request keeps both
-    // establishments (sân bay, nhà hàng) and addresses in the result
-    // list.
-    final uri = Uri.parse(_autocompleteUrl).replace(
-      queryParameters: <String, String>{
-        'input': input,
-        'language': 'vi',
-        'components': 'country:vn',
-        'location': '$_kDanangBiasLat,$_kDanangBiasLng',
-        'radius': '$_kDanangBiasRadiusMeters',
-        'key': Env.googleMapsApiKey,
-      },
-    );
+    if (!Env.hasTrackasiaKey) return const [];
+
+    final uri =
+        Uri.https(Env.trackasiaApiHost, _autocompletePath, <String, String>{
+          'input': input,
+          'language': 'vi',
+          'location': '${Env.danangLat},${Env.danangLng}',
+          'radius': '30000',
+          'new_admin': 'true',
+          'key': Env.trackasiaApiKey,
+        });
     try {
       final res = await http.get(uri).timeout(const Duration(seconds: 6));
       if (res.statusCode != 200) {
@@ -202,16 +191,16 @@ class PlacesService {
     }
   }
 
+  /// Place Details — required after autocomplete because TrackAsia
+  /// predictions don't include geometry (unlike what the v1 plan
+  /// originally claimed).
   static Future<PlaceDetails?> getDetails(String placeId) async {
-    if (!Env.hasGoogleMapsKey) return null;
-    final uri = Uri.parse(_detailsUrl).replace(
-      queryParameters: <String, String>{
-        'place_id': placeId,
-        'language': 'vi',
-        'fields': 'place_id,name,formatted_address,geometry/location',
-        'key': Env.googleMapsApiKey,
-      },
-    );
+    if (!Env.hasTrackasiaKey) return null;
+    final uri = Uri.https(Env.trackasiaApiHost, _detailsPath, <String, String>{
+      'place_id': placeId,
+      'language': 'vi',
+      'key': Env.trackasiaApiKey,
+    });
     try {
       final res = await http.get(uri).timeout(const Duration(seconds: 6));
       if (res.statusCode != 200) return null;
@@ -227,7 +216,7 @@ class PlacesService {
       final geo = result['geometry'] as Map<String, dynamic>;
       final loc = geo['location'] as Map<String, dynamic>;
       return PlaceDetails(
-        placeId: result['place_id'] as String,
+        placeId: result['place_id'] as String? ?? placeId,
         name:
             (result['name'] as String?) ??
             (result['formatted_address'] as String? ?? ''),
@@ -241,23 +230,21 @@ class PlacesService {
     }
   }
 
-  /// Reverse-geocode a coordinate into the best-guess Vietnamese formatted
-  /// address (e.g. "280 Trần Phú, Hải Châu, Đà Nẵng"). Returns `null` on
-  /// network failure or non-OK status; callers should fall back to showing
-  /// the raw lat/lng.
+  /// Reverse-geocode a coordinate into the best Vietnamese formatted
+  /// address. Returns `null` on failure; callers should fall back to
+  /// showing the raw lat/lng.
   static Future<String?> reverseGeocode({
     required double lat,
     required double lng,
   }) async {
-    if (!Env.hasGoogleMapsKey) return null;
-    final uri = Uri.parse(_geocodeUrl).replace(
-      queryParameters: <String, String>{
-        'latlng': '$lat,$lng',
-        'language': 'vi',
-        'result_type': 'street_address|premise|route|neighborhood',
-        'key': Env.googleMapsApiKey,
-      },
-    );
+    if (!Env.hasTrackasiaKey) return null;
+    final uri = Uri.https(Env.trackasiaApiHost, _geocodePath, <String, String>{
+      'latlng': '$lat,$lng',
+      'language': 'vi',
+      'new_admin': 'true',
+      'size': '1',
+      'key': Env.trackasiaApiKey,
+    });
     try {
       final res = await http.get(uri).timeout(const Duration(seconds: 6));
       if (res.statusCode != 200) return null;

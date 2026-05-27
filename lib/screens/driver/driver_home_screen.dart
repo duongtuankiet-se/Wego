@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
 import 'package:sliding_up_panel/sliding_up_panel.dart';
 
@@ -15,6 +15,7 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_glass.dart';
+import '../../core/widgets/wg_trackasia_map.dart';
 import '../../core/widgets/wg_incentive_card.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_hotspots.dart';
@@ -38,13 +39,13 @@ class DriverHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
-  GoogleMapController? _map;
+  MapLibreMapController? _map;
   bool _modalOpen = false;
   String? _lastHandledOfferId;
 
   @override
   void dispose() {
-    _map?.dispose();
+    // MapLibreMapController is owned by the widget.
     super.dispose();
   }
 
@@ -195,43 +196,76 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   }
 }
 
-class _MapBody extends StatelessWidget {
+class _MapBody extends StatefulWidget {
   const _MapBody({required this.onMapCreated, required this.driverPos});
-  final ValueChanged<GoogleMapController> onMapCreated;
+  final ValueChanged<MapLibreMapController> onMapCreated;
   final LatLng driverPos;
 
   @override
+  State<_MapBody> createState() => _MapBodyState();
+}
+
+class _MapBodyState extends State<_MapBody> {
+  MapLibreMapController? _ctrl;
+  Circle? _driverCircle;
+  bool _styleReady = false;
+
+  @override
+  void didUpdateWidget(_MapBody old) {
+    super.didUpdateWidget(old);
+    if (_styleReady &&
+        old.driverPos != widget.driverPos &&
+        _driverCircle != null) {
+      _ctrl?.updateCircle(
+        _driverCircle!,
+        CircleOptions(geometry: widget.driverPos),
+      );
+    }
+  }
+
+  Future<void> _onStyleLoaded() async {
+    final ctrl = _ctrl;
+    if (ctrl == null) return;
+    // Hotspot demand zones — each gets two stacked circles for the
+    // soft "heat" look (translucent outer + solid inner).
+    for (final h in kHotspots) {
+      final hex = '#${h.heatColor.toARGB32().toRadixString(16).substring(2)}';
+      await ctrl.addCircle(
+        CircleOptions(
+          geometry: LatLng(h.lat, h.lng),
+          circleRadius: h.heatRadius * 0.6,
+          circleColor: hex,
+          circleOpacity: 0.18,
+          circleStrokeColor: hex,
+          circleStrokeWidth: 1,
+          circleStrokeOpacity: 0.55,
+        ),
+      );
+    }
+    _driverCircle = await ctrl.addCircle(
+      CircleOptions(
+        geometry: widget.driverPos,
+        circleRadius: 10,
+        circleColor: '#0FB67E',
+        circleStrokeColor: '#FFFFFF',
+        circleStrokeWidth: 3,
+      ),
+    );
+    _styleReady = true;
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(target: driverPos, zoom: 13),
-      onMapCreated: onMapCreated,
-      myLocationEnabled: false,
-      myLocationButtonEnabled: false,
-      zoomControlsEnabled: false,
-      mapToolbarEnabled: false,
-      compassEnabled: false,
+    return WgTrackAsiaMap(
+      initialCenter: widget.driverPos,
+      initialZoom: 13,
+      onMapCreated: (c) {
+        _ctrl = c;
+        widget.onMapCreated(c);
+      },
+      onStyleLoadedCallback: _onStyleLoaded,
       rotateGesturesEnabled: false,
       tiltGesturesEnabled: false,
-      circles: <Circle>{
-        for (final h in kHotspots)
-          Circle(
-            circleId: CircleId(h.id),
-            center: LatLng(h.lat, h.lng),
-            radius: h.heatRadius * 8,
-            fillColor: h.heatColor.withValues(alpha: 0.18),
-            strokeColor: h.heatColor.withValues(alpha: 0.55),
-            strokeWidth: 1,
-          ),
-      },
-      markers: <Marker>{
-        Marker(
-          markerId: const MarkerId('driver'),
-          position: driverPos,
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            BitmapDescriptor.hueAzure,
-          ),
-        ),
-      },
     );
   }
 }

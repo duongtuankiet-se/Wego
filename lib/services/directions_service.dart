@@ -2,17 +2,17 @@ import 'dart:convert';
 import 'dart:developer' as developer;
 
 import 'package:flutter_polyline_points/flutter_polyline_points.dart';
-import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http;
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 import '../core/env.dart';
 import '../core/utils/geohash_util.dart';
 
 class DirectionsRoute {
-  /// Decoded polyline points to feed into a [Polyline].
+  /// Decoded polyline points to feed into a [LineLayer] / `addLine`.
   final List<LatLng> points;
 
-  /// Total route distance in meters (from Google's first leg).
+  /// Total route distance in meters (from the first leg).
   final int distanceMeters;
   final String distanceText;
 
@@ -20,11 +20,12 @@ class DirectionsRoute {
   final int durationSeconds;
   final String durationText;
 
-  /// Tight bounds around the route — use with CameraUpdate.newLatLngBounds.
+  /// Tight bounds around the route — use with
+  /// `MaplibreMapController.animateCamera(CameraUpdate.newLatLngBounds(...))`.
   final LatLngBounds bounds;
 
-  /// Turn-by-turn maneuvers along the first leg. Empty if the API didn't
-  /// return any (rare but possible for ZERO_RESULTS or 1-point routes).
+  /// Turn-by-turn maneuvers along the first leg. Empty if the API
+  /// didn't return any (ZERO_RESULTS or 1-point routes).
   final List<DirectionsStep> steps;
 
   const DirectionsRoute({
@@ -41,9 +42,9 @@ class DirectionsRoute {
   int get durationMin => (durationSeconds / 60).round();
 }
 
-/// One maneuver in a leg (e.g. "Rẽ phải vào Trần Phú"). Coordinates are
-/// for the segment endpoint — used to decide when to advance the
-/// instruction card as the driver crosses it.
+/// One maneuver in a leg (e.g. "Rẽ phải vào Trần Phú"). [start]/[end]
+/// are the segment endpoints — used to decide when to advance the
+/// instruction card as the driver crosses them.
 class DirectionsStep {
   final String instruction;
   final int distanceMeters;
@@ -64,29 +65,36 @@ class DirectionsStep {
   });
 }
 
-/// Thin wrapper around the Google Directions REST API. The repo only
-/// uses the driving profile + Vietnamese language. Result is parsed into
-/// a [DirectionsRoute] suitable for direct GoogleMap consumption.
+/// Thin wrapper around the **TrackAsia Directions v2** REST API.
+///
+/// Response shape mirrors Google Directions (routes[].legs[].steps[],
+/// `overview_polyline.points` encoded), so the existing parser logic +
+/// Phosphor maneuver-icon mapping reuse without changes.
+///
+/// **Quirk:** `start_location` / `end_location` fields on each step
+/// arrive with **lat and lng swapped** (lat field holds longitude
+/// and vice versa). `bounds.northeast/southwest` and Reverse Geocoding
+/// are NOT affected. Verified against multiple test routes 2026-05-27.
+/// We unswap them in [_parseStepLatLng] below.
 class DirectionsService {
   DirectionsService._();
 
-  static const _endpoint =
-      'https://maps.googleapis.com/maps/api/directions/json';
+  static const _path = '/route/v2/directions/json';
 
-  /// Returns the first route, or null on any error / quota issue.
+  /// Returns the first route, or `null` on any error / quota issue.
   static Future<DirectionsRoute?> getRoute({
     required LatLng origin,
     required LatLng destination,
     String mode = 'driving',
   }) async {
-    if (!Env.hasGoogleMapsKey) {
-      developer.log('Missing GOOGLE_MAPS_API_KEY', name: 'directions');
+    if (!Env.hasTrackasiaKey) {
+      developer.log('Missing TRACKASIA_API_KEY', name: 'directions');
       return null;
     }
-    // Short straight-line trips reliably return ZERO_RESULTS from
-    // Directions ("the destination is on the same building"). Skip the
-    // call so the caller can fall back to its own interpolated polyline
-    // without burning quota.
+
+    // Skip the call for sub-50m hops — TrackAsia (and Google) returns
+    // ZERO_RESULTS for "destination is on the same building", so save
+    // the round-trip + let the caller use its interpolated fallback.
     final straightKm = GeohashUtil.distanceKm(
       origin.latitude,
       origin.longitude,
@@ -100,21 +108,19 @@ class DirectionsService {
       );
       return null;
     }
-    final uri = Uri.parse(_endpoint).replace(
-      queryParameters: <String, String>{
-        'origin': '${origin.latitude},${origin.longitude}',
-        'destination': '${destination.latitude},${destination.longitude}',
-        'mode': mode,
-        'language': 'vi',
-        'region': 'vn',
-        'key': Env.googleMapsApiKey,
-      },
-    );
+
+    final uri = Uri.https(Env.trackasiaApiHost, _path, <String, String>{
+      'origin': '${origin.latitude},${origin.longitude}',
+      'destination': '${destination.latitude},${destination.longitude}',
+      'mode': mode,
+      'new_admin': 'true',
+      'language': 'vi',
+      'key': Env.trackasiaApiKey,
+    });
 
     try {
-      final res = await http.get(uri).timeout(const Duration(seconds: 8));
+      final res = await http.get(uri).timeout(const Duration(seconds: 10));
       if (res.statusCode != 200) {
-        // Truncate body so a 5MB error page doesn't flood the console.
         final preview = res.body.length > 240
             ? '${res.body.substring(0, 240)}…'
             : res.body;
@@ -138,10 +144,11 @@ class DirectionsService {
       }
       final route = routes.first as Map<String, dynamic>;
       final legs = route['legs'] as List;
+      if (legs.isEmpty) return null;
       final leg = legs.first as Map<String, dynamic>;
+
       final overview = route['overview_polyline'] as Map<String, dynamic>;
       final encoded = overview['points'] as String;
-
       final decoded = PolylinePoints()
           .decodePolyline(encoded)
           .map((p) => LatLng(p.latitude, p.longitude))
@@ -151,36 +158,34 @@ class DirectionsService {
       final ne = boundsJson['northeast'] as Map<String, dynamic>;
       final sw = boundsJson['southwest'] as Map<String, dynamic>;
 
+      // ── steps with lat/lng unswap fix ─────────────────────────────
+      // TrackAsia v2 bug: step.start_location / end_location report
+      // {lat: <lng>, lng: <lat>}. Unswap so consumers don't see Đà
+      // Nẵng plotted in the Atlantic.
       final stepsJson = (leg['steps'] as List?) ?? const [];
       final steps = stepsJson
           .map((s) {
             final m = s as Map<String, dynamic>;
-            final start = m['start_location'] as Map<String, dynamic>;
-            final end = m['end_location'] as Map<String, dynamic>;
+            final distObj = m['distance'];
+            final durObj = m['duration'];
             return DirectionsStep(
               instruction: _stripHtml(m['html_instructions'] as String? ?? ''),
-              distanceMeters: (m['distance']?['value'] as num?)?.toInt() ?? 0,
-              distanceText: m['distance']?['text'] as String? ?? '',
-              durationSeconds: (m['duration']?['value'] as num?)?.toInt() ?? 0,
+              distanceMeters: _intFromValue(distObj),
+              distanceText: _textFromValue(distObj),
+              durationSeconds: _intFromValue(durObj),
               maneuver: m['maneuver'] as String?,
-              start: LatLng(
-                (start['lat'] as num).toDouble(),
-                (start['lng'] as num).toDouble(),
-              ),
-              end: LatLng(
-                (end['lat'] as num).toDouble(),
-                (end['lng'] as num).toDouble(),
-              ),
+              start: _parseStepLatLng(m['start_location']),
+              end: _parseStepLatLng(m['end_location']),
             );
           })
           .toList(growable: false);
 
       return DirectionsRoute(
         points: decoded,
-        distanceMeters: (leg['distance']['value'] as num).toInt(),
-        distanceText: leg['distance']['text'] as String,
-        durationSeconds: (leg['duration']['value'] as num).toInt(),
-        durationText: leg['duration']['text'] as String,
+        distanceMeters: _intFromValue(leg['distance']),
+        distanceText: _textFromValue(leg['distance']),
+        durationSeconds: _intFromValue(leg['duration']),
+        durationText: _textFromValue(leg['duration']),
         bounds: LatLngBounds(
           southwest: LatLng(
             (sw['lat'] as num).toDouble(),
@@ -199,9 +204,37 @@ class DirectionsService {
     }
   }
 
-  /// Strip Google's HTML markup ("<b>Trần Phú</b>") down to readable text
-  /// ("Trần Phú"). Crude but enough for the turn instructions Google
-  /// returns — they only use a handful of tags.
+  /// Read `start_location` / `end_location` and unswap. Detection is
+  /// purely from the value range — Vietnam lat is roughly 8–24 and
+  /// lng 102–110, so anything > 90 in the "lat" field is the
+  /// swapped longitude.
+  static LatLng _parseStepLatLng(Object? raw) {
+    if (raw is! Map) return const LatLng(0, 0);
+    final a = (raw['lat'] as num?)?.toDouble() ?? 0;
+    final b = (raw['lng'] as num?)?.toDouble() ?? 0;
+    // If "lat" exceeds 90 it physically can't be a latitude → swapped.
+    if (a.abs() > 90) {
+      return LatLng(b, a);
+    }
+    return LatLng(a, b);
+  }
+
+  /// TrackAsia distance/duration can arrive as either a structured
+  /// `{text, value}` Map (Google-style) or a stringified PowerShell
+  /// PSCustomObject ("@{text=0.3km; value=342}") when intermediate
+  /// JSON gets re-serialized somewhere. Handle both.
+  static int _intFromValue(Object? raw) {
+    if (raw is Map) return (raw['value'] as num? ?? 0).toInt();
+    return 0;
+  }
+
+  static String _textFromValue(Object? raw) {
+    if (raw is Map) return raw['text'] as String? ?? '';
+    return '';
+  }
+
+  /// Strip Google/TrackAsia HTML markup ("<b>Trần Phú</b>") down to
+  /// readable text. Both APIs only use a handful of tags.
   static String _stripHtml(String html) {
     final withBreaks = html
         .replaceAll(RegExp(r'<br\s*/?>', caseSensitive: false), ' · ')

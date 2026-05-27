@@ -1,6 +1,6 @@
 import 'dart:math' as math;
 
-import 'package:google_maps_flutter/google_maps_flutter.dart';
+import 'package:maplibre_gl/maplibre_gl.dart';
 
 /// Curved fallback polyline for when Google Directions returns null
 /// (quota exhausted, no network, ZERO_RESULTS for very short trips).
