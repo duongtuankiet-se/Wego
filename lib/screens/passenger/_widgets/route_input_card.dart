@@ -145,13 +145,14 @@ class _DropoffField extends StatelessWidget {
         onChanged: onChanged,
         onSubmitted: onSubmitted,
         textInputAction: TextInputAction.search,
-        // VN IME hardening: autocorrect interferes with Telex/VNI
-        // composing regions (Samsung/Xiaomi keyboards drop characters
-        // when autocorrect tries to "fix" a diacritic mid-compose).
-        // Keep suggestions on so the user still sees their recent typed
-        // words, but no auto-replace.
+        // VN IME hardening (Phase 5L): Samsung/Xiaomi keyboards + Telex
+        // drop the last character when any of autocorrect / suggestions /
+        // smart-quotes try to mutate the composing region mid-diacritic.
+        // Turn them all off and rely on debounce to read the field.
         autocorrect: false,
-        enableSuggestions: true,
+        enableSuggestions: false,
+        smartDashesType: SmartDashesType.disabled,
+        smartQuotesType: SmartQuotesType.disabled,
         keyboardType: TextInputType.text,
         cursorColor: AppColors.primary500,
         style: AppTypography.body.copyWith(

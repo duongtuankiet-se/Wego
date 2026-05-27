@@ -13,6 +13,7 @@ import '../../core/widgets/wg_toast.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '_widgets/auth_header.dart';
+import '_widgets/google_sign_in_button.dart';
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key, this.initialRole = UserRole.passenger});
@@ -28,6 +29,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   final _phoneCtrl = TextEditingController();
   late UserRole _role;
   bool _loading = false;
+  bool _googleLoading = false;
 
   @override
   void initState() {
@@ -68,8 +70,37 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
     );
   }
 
+  Future<void> _handleGoogle() async {
+    setState(() => _googleLoading = true);
+
+    final error = await ref
+        .read(authStateProvider.notifier)
+        .signInWithGoogleAndLogin(defaultRole: _role);
+
+    if (!mounted) return;
+    setState(() => _googleLoading = false);
+
+    if (error != null) {
+      WgToast.error(context, error);
+      return;
+    }
+
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) {
+      WgToast.error(context, 'Không tải được tài khoản');
+      return;
+    }
+
+    if (user.role == UserRole.driver) {
+      context.go('/driver/home');
+    } else {
+      context.go('/passenger/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final anyLoading = _loading || _googleLoading;
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
@@ -100,7 +131,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   prefixIcon: PhosphorIconsRegular.userCircle,
                   validator: Validators.validateName,
                   textInputAction: TextInputAction.next,
-                  enabled: !_loading,
+                  enabled: !anyLoading,
                 ),
                 const SizedBox(height: 16),
                 WgInput(
@@ -111,7 +142,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   prefixIcon: PhosphorIconsRegular.phone,
                   validator: Validators.validatePhone,
                   textInputAction: TextInputAction.done,
-                  enabled: !_loading,
+                  enabled: !anyLoading,
                   onSubmitted: (_) => _submit(),
                 ),
                 const SizedBox(height: 20),
@@ -126,7 +157,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                 _RoleSelector(
                   selected: _role,
                   onChanged: (r) => setState(() => _role = r),
-                  enabled: !_loading,
+                  enabled: !anyLoading,
                 ),
                 const SizedBox(height: 28),
                 WgButton.primary(
@@ -134,12 +165,20 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                   size: WgButtonSize.lg,
                   isFullWidth: true,
                   isLoading: _loading,
-                  onPressed: _loading ? null : _submit,
+                  onPressed: anyLoading ? null : _submit,
+                ),
+                const SizedBox(height: 20),
+                const _OrDivider(),
+                const SizedBox(height: 16),
+                GoogleSignInButton(
+                  loading: _googleLoading,
+                  enabled: !anyLoading,
+                  onPressed: _handleGoogle,
                 ),
                 const SizedBox(height: 16),
                 Center(
                   child: TextButton(
-                    onPressed: _loading ? null : () => context.go('/login'),
+                    onPressed: anyLoading ? null : () => context.go('/login'),
                     child: RichText(
                       text: TextSpan(
                         style: AppTypography.body.copyWith(
@@ -173,6 +212,27 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
           ),
         ),
       ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: AppColors.ink200, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text(
+            'hoặc',
+            style: AppTypography.caption.copyWith(color: AppColors.ink400),
+          ),
+        ),
+        const Expanded(child: Divider(color: AppColors.ink200, thickness: 1)),
+      ],
     );
   }
 }

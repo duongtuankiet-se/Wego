@@ -21,6 +21,7 @@ import 'screens/driver/driver_profile_screen.dart';
 import 'screens/driver/driver_shell.dart';
 import 'screens/driver/driver_trip_completed_screen.dart';
 import 'screens/driver/driver_wallet_screen.dart';
+import 'screens/notifications/notification_screen.dart';
 import 'screens/passenger/home_screen.dart';
 import 'screens/passenger/live_trip_screen.dart';
 import 'screens/passenger/map_picker_screen.dart';
@@ -31,6 +32,9 @@ import 'screens/passenger/passenger_promo_screen.dart';
 import 'screens/passenger/passenger_shell.dart';
 import 'screens/passenger/passenger_support_screen.dart';
 import 'screens/passenger/ride_options_screen.dart';
+import 'screens/passenger/schedule_confirmation_screen.dart';
+import 'screens/passenger/schedule_detail_screen.dart';
+import 'screens/passenger/schedule_ride_screen.dart';
 import 'screens/passenger/search_screen.dart';
 import 'screens/passenger/trip_summary_screen.dart';
 
@@ -260,6 +264,38 @@ GoRouter router(Ref ref) {
         pageBuilder: (context, state) => _slideUpPage(
           state: state,
           child: TripSummaryScreen(tripId: state.pathParameters['tripId']!),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/notifications',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const NotificationScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/passenger/schedule',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const ScheduleRideScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/passenger/schedule-confirm/:tripId',
+        pageBuilder: (context, state) => _fadeScalePage(
+          state: state,
+          child: ScheduleConfirmationScreen(
+            tripId: state.pathParameters['tripId']!,
+          ),
+        ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/passenger/schedule-detail/:tripId',
+        pageBuilder: (context, state) => _slideUpPage(
+          state: state,
+          child: ScheduleDetailScreen(
+            tripId: state.pathParameters['tripId']!,
+          ),
         ),
       ),
       GoRoute(

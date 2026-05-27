@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:phosphor_flutter/phosphor_flutter.dart';
@@ -10,21 +11,17 @@ import '../../core/theme/app_typography.dart';
 import '../../core/utils/string_utils.dart';
 import '../../core/widgets/wg_avatar.dart';
 import '../../core/widgets/wg_explore_carousel.dart';
-import '../../core/widgets/wg_quick_service_tile.dart';
 import '../../core/widgets/wg_search_bar.dart';
-import '../../core/widgets/wg_service_card.dart';
-import '../../core/widgets/wg_toast.dart';
 import '../../data/mock_explore_places.dart';
-import '../../data/mock_quick_services.dart';
 import '../../models/place.dart';
-import '../../models/trip.dart';
 import '../../providers/auth_provider.dart';
-import '../../providers/custom_pickup_provider.dart';
+import '../../providers/notifications_provider.dart';
 import '../../providers/selected_destination_provider.dart';
-import '../../providers/selected_ride_type_provider.dart';
 
-/// Xanh SM-style landing dashboard. Compact 16px gutters, no map preview
-/// (map only shown when picking a destination / live trip / driver home).
+/// Phase 5I landing dashboard. Two hero cards drive the two primary
+/// flows — instant booking ("Đặt ngay" → /passenger/search) and
+/// scheduled ride ("Đặt sau" → /passenger/schedule). The legacy
+/// 4-item quick-services grid was removed in 5I.
 class PassengerHomeScreen extends ConsumerWidget {
   const PassengerHomeScreen({super.key});
 
@@ -35,51 +32,9 @@ class PassengerHomeScreen extends ConsumerWidget {
     }
   }
 
-  void _openSearchWithType(BuildContext context, WidgetRef ref, TripType type) {
-    ref.read(selectedRideTypeProvider.notifier).set(type);
-    _openSearch(context);
-  }
-
   void _quickPickPlace(BuildContext context, WidgetRef ref, Place place) {
     ref.read(selectedDestinationProvider.notifier).set(place);
     context.push('/passenger/ride-options');
-  }
-
-  /// Preset destination used by the "Sân bay" quick tile. Coords match
-  /// the Phase 5C saved-place entry so recents + matching stay aligned.
-  static const Place _airportPreset = Place(
-    id: 'preset_dad_airport',
-    name: 'Sân bay Quốc tế Đà Nẵng',
-    address: 'Hải Châu, Đà Nẵng',
-    lat: 16.0439,
-    lng: 108.1995,
-    icon: 'airplane',
-  );
-
-  Future<void> _handleQuickService(
-    BuildContext context,
-    WidgetRef ref,
-    QuickService svc,
-  ) async {
-    switch (svc.action) {
-      case QuickServiceAction.openSearch:
-        await _openSearch(context);
-      case QuickServiceAction.presetDropoff:
-        _quickPickPlace(context, ref, _airportPreset);
-      case QuickServiceAction.comingSoon:
-        WgToast.info(context, '${svc.label} sẽ ra mắt sớm');
-      case QuickServiceAction.pickCustomPickup:
-        // "Đi đón khách": let the user pin a friend's location on the
-        // map → treat that as the trip's pickup (overriding GPS) → drop
-        // them into Search to choose the dropoff.
-        final picked = await context.push<Place>(
-          '/passenger/map-picker?mode=pickup',
-        );
-        if (picked == null || !context.mounted) return;
-        ref.read(customPickupProvider.notifier).set(picked);
-        WgToast.success(context, 'Đã chọn điểm đón: ${picked.name}');
-        await _openSearch(context);
-    }
   }
 
   void _onExploreTap(BuildContext context, WidgetRef ref, CityExplore city) {
@@ -112,7 +67,13 @@ class PassengerHomeScreen extends ConsumerWidget {
         child: SafeArea(
           child: CustomScrollView(
             slivers: [
-              SliverToBoxAdapter(child: _Header(name: user?.name ?? 'bạn')),
+              SliverToBoxAdapter(
+                child: _Header(
+                  name: user?.name ?? 'bạn',
+                  unreadCount: ref.watch(unreadNotificationCountProvider),
+                  onBellTap: () => context.push('/notifications'),
+                ),
+              ),
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(16, 4, 16, 14),
@@ -125,32 +86,38 @@ class PassengerHomeScreen extends ConsumerWidget {
                   child: Row(
                     children: [
                       Expanded(
-                        child: WgServiceCard.bookRide(
-                          onTap: () => _openSearchWithType(
-                            context,
-                            ref,
-                            TripType.private,
-                          ),
+                        child: _BookingHeroCard(
+                          icon: PhosphorIconsFill.carProfile,
+                          title: 'Đặt ngay',
+                          subtitle: 'Tài xế tới sau 3-5 phút',
+                          gradient: const [
+                            AppColors.primary500,
+                            AppColors.primary600,
+                          ],
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            _openSearch(context);
+                          },
                         ),
                       ),
                       const SizedBox(width: 10),
                       Expanded(
-                        child: WgServiceCard.bookShared(
-                          onTap: () => _openSearchWithType(
-                            context,
-                            ref,
-                            TripType.shared,
-                          ),
+                        child: _BookingHeroCard(
+                          icon: PhosphorIconsFill.calendarPlus,
+                          title: 'Đặt sau',
+                          subtitle: 'Hẹn trước 30 phút – 7 ngày',
+                          gradient: const [
+                            AppColors.sharedAccent,
+                            Color(0xFF0EA5E9),
+                          ],
+                          onTap: () {
+                            HapticFeedback.lightImpact();
+                            context.push('/passenger/schedule');
+                          },
                         ),
                       ),
                     ],
                   ),
-                ),
-              ),
-              const SliverToBoxAdapter(child: SizedBox(height: 18)),
-              SliverToBoxAdapter(
-                child: _QuickServicesGrid(
-                  onTileTap: (svc) => _handleQuickService(context, ref, svc),
                 ),
               ),
               const SliverToBoxAdapter(child: SizedBox(height: 18)),
@@ -183,8 +150,15 @@ class PassengerHomeScreen extends ConsumerWidget {
 }
 
 class _Header extends StatelessWidget {
-  const _Header({required this.name});
+  const _Header({
+    required this.name,
+    required this.unreadCount,
+    required this.onBellTap,
+  });
+
   final String name;
+  final int unreadCount;
+  final VoidCallback onBellTap;
 
   @override
   Widget build(BuildContext context) {
@@ -216,76 +190,153 @@ class _Header extends StatelessWidget {
               ],
             ),
           ),
-          Container(
-            width: 36,
-            height: 36,
-            decoration: BoxDecoration(
-              color: AppColors.white,
-              shape: BoxShape.circle,
-              boxShadow: AppShadows.xs,
-            ),
-            child: const Stack(
-              alignment: Alignment.center,
-              children: [
-                Icon(
-                  PhosphorIconsRegular.bell,
-                  color: AppColors.ink700,
-                  size: 18,
-                ),
-                Positioned(top: 9, right: 9, child: _NotificationDot()),
-              ],
-            ),
-          ),
+          _BellButton(unreadCount: unreadCount, onTap: onBellTap),
         ],
       ),
     );
   }
 }
 
-class _NotificationDot extends StatelessWidget {
-  const _NotificationDot();
+class _BellButton extends StatelessWidget {
+  const _BellButton({required this.unreadCount, required this.onTap});
+
+  final int unreadCount;
+  final VoidCallback onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 7,
-      height: 7,
-      decoration: BoxDecoration(
-        color: AppColors.danger,
-        shape: BoxShape.circle,
-        border: Border.all(color: AppColors.white, width: 1),
+    return Material(
+      color: AppColors.white,
+      shape: const CircleBorder(),
+      elevation: 0,
+      shadowColor: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: Container(
+          width: 36,
+          height: 36,
+          decoration: const BoxDecoration(
+            shape: BoxShape.circle,
+            boxShadow: AppShadows.xs,
+          ),
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              const Icon(
+                PhosphorIconsRegular.bell,
+                color: AppColors.ink700,
+                size: 18,
+              ),
+              if (unreadCount > 0)
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: BoxDecoration(
+                      color: AppColors.danger,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppColors.white, width: 1.5),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
       ),
     );
   }
 }
 
-class _QuickServicesGrid extends StatelessWidget {
-  const _QuickServicesGrid({required this.onTileTap});
-  final ValueChanged<QuickService> onTileTap;
+class _BookingHeroCard extends StatelessWidget {
+  const _BookingHeroCard({
+    required this.icon,
+    required this.title,
+    required this.subtitle,
+    required this.gradient,
+    required this.onTap,
+  });
+
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  final List<Color> gradient;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 12),
-        decoration: BoxDecoration(
-          color: AppColors.white,
-          borderRadius: AppRadius.card,
-          boxShadow: AppShadows.xs,
-        ),
-        child: Row(
-          children: kQuickServices
-              .map(
-                (s) => Expanded(
-                  child: WgQuickServiceTile(
-                    icon: s.icon,
-                    label: s.label,
-                    color: s.color,
-                    onTap: () => onTileTap(s),
-                  ),
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: AppRadius.heroCard,
+        child: Container(
+          height: 140,
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              colors: gradient,
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+            ),
+            borderRadius: AppRadius.heroCard,
+            boxShadow: AppShadows.heroGlow(gradient.first),
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned(
+                right: -8,
+                bottom: -10,
+                child: Icon(
+                  icon,
+                  size: 90,
+                  color: AppColors.white.withValues(alpha: 0.18),
                 ),
-              )
-              .toList(),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: AppColors.white.withValues(alpha: 0.22),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(icon, color: AppColors.white, size: 22),
+                  ),
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        title,
+                        style: AppTypography.h3.copyWith(
+                          color: AppColors.white,
+                          fontWeight: FontWeight.w700,
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        subtitle,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.white.withValues(alpha: 0.9),
+                          fontWeight: FontWeight.w500,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ],
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
