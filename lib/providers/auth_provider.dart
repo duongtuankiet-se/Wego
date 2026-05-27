@@ -96,6 +96,7 @@ class AuthState extends _$AuthState {
           'role': role.name,
           'firebase_uid': firebaseUid,
           'avatar': null,
+          'provider': AuthProvider.phone.name,
           'created_at': now,
           'updated_at': now,
         };
@@ -107,6 +108,85 @@ class AuthState extends _$AuthState {
             userId: newDoc['_id'] as ObjectId,
             name: name.trim(),
             phone: phone,
+            now: now,
+          );
+        }
+      }
+
+      final user = User.fromMongo(finalDoc);
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString(_kPrefUserId, user.id);
+      await prefs.setString(_kPrefUserRole, user.role.name);
+
+      state = AsyncData(user);
+      return null;
+    } catch (e) {
+      return 'Lưu thông tin thất bại: $e';
+    }
+  }
+
+  /// Phase 5H: Google Sign-In. Pops the native Google account picker,
+  /// upserts the user in Mongo keyed by email, then persists the
+  /// session. [defaultRole] is only used when this is a brand-new
+  /// account; existing users keep whatever role they had.
+  ///
+  /// Returns `null` on success, or a Vietnamese error message.
+  Future<String?> signInWithGoogleAndLogin({
+    required UserRole defaultRole,
+  }) async {
+    final result = await AuthService.signInWithGoogle();
+    if (!result.isSuccess) return result.error;
+
+    final firebaseUid = result.firebaseUid!;
+    final email = result.email!;
+    final displayName = result.displayName!;
+    final photoUrl = result.photoUrl;
+    final now = DateTime.now().toUtc();
+
+    try {
+      final mongo = ref.read(mongoServiceProvider);
+      final users = await mongo.users();
+      final existing = await users.findOne(where.eq('email', email));
+
+      Map<String, dynamic> finalDoc;
+      if (existing != null) {
+        // Existing account → just refresh the volatile fields (Firebase
+        // UID may rotate, avatar may change in their Google profile).
+        await users.updateOne(
+          where.eq('_id', existing['_id']),
+          modify
+              .set('firebase_uid', firebaseUid)
+              .set('avatar', photoUrl ?? existing['avatar'])
+              .set('updated_at', now),
+        );
+        finalDoc = Map<String, dynamic>.from(existing)
+          ..['firebase_uid'] = firebaseUid
+          ..['avatar'] = photoUrl ?? existing['avatar']
+          ..['updated_at'] = now;
+      } else {
+        // First sign-in with this Google account → create the doc with
+        // the role the user picked on RoleSelect. Phone stays null until
+        // they add one in profile (Phase later).
+        final newDoc = <String, dynamic>{
+          '_id': ObjectId(),
+          'name': displayName,
+          'phone': null,
+          'email': email,
+          'role': defaultRole.name,
+          'firebase_uid': firebaseUid,
+          'avatar': photoUrl,
+          'provider': AuthProvider.google.name,
+          'created_at': now,
+          'updated_at': now,
+        };
+        await users.insertOne(newDoc);
+        finalDoc = newDoc;
+
+        if (defaultRole == UserRole.driver) {
+          await _seedDriverForUser(
+            userId: newDoc['_id'] as ObjectId,
+            name: displayName,
+            phone: '',
             now: now,
           );
         }

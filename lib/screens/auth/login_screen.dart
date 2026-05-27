@@ -10,11 +10,14 @@ import '../../core/utils/validators.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_input.dart';
 import '../../core/widgets/wg_toast.dart';
+import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '_widgets/auth_header.dart';
 
-/// Phone-only login (Phase 5D). For accounts already in Mongo, name +
-/// role come from the stored doc — we only re-verify the phone via OTP.
+/// Login (Phase 5D phone-only + Phase 5H Google). For accounts already
+/// in Mongo, name + role come from the stored doc. Google sign-in
+/// defaults brand-new accounts to the Passenger role; existing users
+/// keep their stored role.
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
@@ -26,6 +29,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _phoneCtrl = TextEditingController();
   bool _loading = false;
+  bool _googleLoading = false;
 
   @override
   void dispose() {
@@ -54,8 +58,37 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     );
   }
 
+  Future<void> _handleGoogle() async {
+    setState(() => _googleLoading = true);
+
+    final error = await ref
+        .read(authStateProvider.notifier)
+        .signInWithGoogleAndLogin(defaultRole: UserRole.passenger);
+
+    if (!mounted) return;
+    setState(() => _googleLoading = false);
+
+    if (error != null) {
+      WgToast.error(context, error);
+      return;
+    }
+
+    final user = ref.read(authStateProvider).valueOrNull;
+    if (user == null) {
+      WgToast.error(context, 'Không tải được tài khoản');
+      return;
+    }
+
+    if (user.role == UserRole.driver) {
+      context.go('/driver/home');
+    } else {
+      context.go('/passenger/home');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final anyLoading = _loading || _googleLoading;
     return Scaffold(
       backgroundColor: AppColors.white,
       appBar: AppBar(
@@ -76,7 +109,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               children: [
                 WgAuthHeader.text(
                   title: 'Chào mừng trở lại',
-                  subtitle: 'Nhập số điện thoại để nhận mã OTP',
+                  subtitle: 'Nhập số điện thoại hoặc đăng nhập với Google',
                 ),
                 const SizedBox(height: 28),
                 WgInput(
@@ -87,21 +120,31 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   prefixIcon: PhosphorIconsRegular.phone,
                   validator: Validators.validatePhone,
                   textInputAction: TextInputAction.done,
-                  enabled: !_loading,
+                  enabled: !anyLoading,
                   onSubmitted: (_) => _submit(),
                 ),
-                const SizedBox(height: 28),
+                const SizedBox(height: 20),
                 WgButton.primary(
                   label: 'Tiếp tục',
                   size: WgButtonSize.lg,
                   isFullWidth: true,
                   isLoading: _loading,
-                  onPressed: _loading ? null : _submit,
+                  onPressed: anyLoading ? null : _submit,
                 ),
+                const SizedBox(height: 24),
+                const _OrDivider(),
                 const SizedBox(height: 16),
+                _GoogleSignInButton(
+                  loading: _googleLoading,
+                  enabled: !anyLoading,
+                  onPressed: _handleGoogle,
+                ),
+                const SizedBox(height: 20),
                 Center(
                   child: TextButton(
-                    onPressed: _loading ? null : () => context.go('/register'),
+                    onPressed: anyLoading
+                        ? null
+                        : () => context.go('/register'),
                     child: RichText(
                       text: TextSpan(
                         style: AppTypography.body.copyWith(
@@ -122,6 +165,113 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                   ),
                 ),
               ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _OrDivider extends StatelessWidget {
+  const _OrDivider();
+
+  @override
+  Widget build(BuildContext context) {
+    return Row(
+      children: [
+        const Expanded(child: Divider(color: AppColors.ink200, thickness: 1)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: Text(
+            'hoặc',
+            style: AppTypography.caption.copyWith(color: AppColors.ink400),
+          ),
+        ),
+        const Expanded(child: Divider(color: AppColors.ink200, thickness: 1)),
+      ],
+    );
+  }
+}
+
+/// Outlined Google sign-in button. WgButton doesn't have an outlined
+/// variant + custom-child slot, so we build it inline. The "G" inside
+/// the white circle is a typographic fallback for the official PNG —
+/// keeps the bundle small + still on-brand at a glance.
+class _GoogleSignInButton extends StatelessWidget {
+  const _GoogleSignInButton({
+    required this.loading,
+    required this.enabled,
+    required this.onPressed,
+  });
+
+  final bool loading;
+  final bool enabled;
+  final VoidCallback onPressed;
+
+  static const _googleBlue = Color(0xFF4285F4);
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: Opacity(
+        opacity: enabled ? 1 : 0.5,
+        child: Material(
+          color: AppColors.white,
+          borderRadius: BorderRadius.circular(16),
+          child: InkWell(
+            onTap: enabled && !loading ? onPressed : null,
+            borderRadius: BorderRadius.circular(16),
+            child: Container(
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.ink200, width: 1),
+              ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  if (loading)
+                    const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(_googleBlue),
+                      ),
+                    )
+                  else ...[
+                    Container(
+                      width: 22,
+                      height: 22,
+                      decoration: BoxDecoration(
+                        color: AppColors.white,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: AppColors.ink200, width: 1),
+                      ),
+                      alignment: Alignment.center,
+                      child: const Text(
+                        'G',
+                        style: TextStyle(
+                          color: _googleBlue,
+                          fontWeight: FontWeight.w700,
+                          fontSize: 14,
+                          height: 1,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      'Đăng nhập với Google',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.ink900,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
             ),
           ),
         ),

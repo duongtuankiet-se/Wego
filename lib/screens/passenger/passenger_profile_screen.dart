@@ -44,7 +44,10 @@ class PassengerProfileScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final user = ref.watch(authStateProvider).valueOrNull;
-    final maskedPhone = user == null ? '—' : formatPhoneMask(user.phone);
+    final phone = user?.phone;
+    final maskedPhone = phone == null || phone.isEmpty
+        ? (user?.email ?? '—')
+        : formatPhoneMask(phone);
     final displayName = user == null ? 'Khách' : toProperCase(user.name);
 
     return Scaffold(
