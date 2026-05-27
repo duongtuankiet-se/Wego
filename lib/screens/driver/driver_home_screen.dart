@@ -636,6 +636,29 @@ class _Panel extends ConsumerWidget {
               ],
             ),
           ),
+          const SizedBox(height: 10),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _ActionButton(
+                    icon: PhosphorIconsRegular.usersThree,
+                    label: 'Pool xe ghép',
+                    onTap: () => context.push('/driver/pools'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: _ActionButton(
+                    icon: PhosphorIconsRegular.car,
+                    label: 'Phương tiện',
+                    onTap: () => context.push('/driver/vehicles'),
+                  ),
+                ),
+              ],
+            ),
+          ),
           const SizedBox(height: 24),
         ],
       ),

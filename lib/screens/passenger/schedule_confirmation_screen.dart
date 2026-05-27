@@ -15,6 +15,7 @@ import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/scheduled_trip.dart';
 import '../../providers/scheduled_trips_provider.dart';
+import '_widgets/pool_tracking_card.dart';
 
 class ScheduleConfirmationScreen extends ConsumerStatefulWidget {
   const ScheduleConfirmationScreen({super.key, required this.tripId});
@@ -86,6 +87,10 @@ class _Body extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
                 _SuccessHero(trip: trip),
+                if (trip.poolId != null) ...[
+                  const SizedBox(height: 16),
+                  PoolTrackingCard(poolId: trip.poolId!),
+                ],
                 const SizedBox(height: 16),
                 _TripCodeCard(trip: trip, onCopy: onCopyCode),
                 const SizedBox(height: 12),

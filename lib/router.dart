@@ -17,9 +17,11 @@ import 'screens/driver/driver_earnings_screen.dart';
 import 'screens/driver/driver_home_screen.dart';
 import 'screens/driver/driver_navigation_screen.dart';
 import 'screens/driver/driver_performance_screen.dart';
+import 'screens/driver/driver_pools_screen.dart';
 import 'screens/driver/driver_profile_screen.dart';
 import 'screens/driver/driver_shell.dart';
 import 'screens/driver/driver_trip_completed_screen.dart';
+import 'screens/driver/driver_vehicles_screen.dart';
 import 'screens/driver/driver_wallet_screen.dart';
 import 'screens/notifications/notification_screen.dart';
 import 'screens/passenger/home_screen.dart';
@@ -317,6 +319,18 @@ GoRouter router(Ref ref) {
             tripId: state.pathParameters['tripId']!,
           ),
         ),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/driver/vehicles',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const DriverVehiclesScreen()),
+      ),
+      GoRoute(
+        parentNavigatorKey: _rootKey,
+        path: '/driver/pools',
+        pageBuilder: (context, state) =>
+            _slideUpPage(state: state, child: const DriverPoolsScreen()),
       ),
 
       if (kDebugMode) ...[
