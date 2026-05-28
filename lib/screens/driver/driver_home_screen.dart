@@ -411,16 +411,17 @@ class _StatusHeroCard extends StatelessWidget {
       child: WgGlass(
         blur: 30,
         opacity: 0.92,
-        borderRadius: BorderRadius.circular(24),
-        padding: const EdgeInsets.fromLTRB(20, 18, 20, 18),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        borderRadius: BorderRadius.circular(20),
+        // Phase 5O: horizontal layout (was a tall Column hero ~230px
+        // that swallowed ~40% of the visible map). Same controls, ~80px.
+        padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+        child: Row(
           children: [
             AnimatedContainer(
               duration: const Duration(milliseconds: 320),
               curve: Curves.easeOutCubic,
-              width: 64,
-              height: 64,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 gradient: LinearGradient(
@@ -439,42 +440,48 @@ class _StatusHeroCard extends StatelessWidget {
                     ? PhosphorIconsFill.carProfile
                     : PhosphorIconsFill.power,
                 color: AppColors.white,
-                size: 30,
+                size: 24,
               ),
             ),
-            const SizedBox(height: 14),
-            Text(
-              isOnline ? 'Đang nhận chuyến' : 'Tạm nghỉ',
-              style: AppTypography.h2.copyWith(
-                color: AppColors.ink900,
-                fontWeight: FontWeight.w700,
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    isOnline ? 'Đang nhận chuyến' : 'Tạm nghỉ',
+                    style: AppTypography.bodyLarge.copyWith(
+                      color: AppColors.ink900,
+                      fontWeight: FontWeight.w700,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    isOnline
+                        ? 'Hệ thống tự động ghép khách'
+                        : 'Bật để bắt đầu nhận chuyến',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.ink500,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
             ),
-            const SizedBox(height: 4),
-            Text(
-              isOnline
-                  ? 'Hệ thống sẽ tự động ghép khách cho bạn'
-                  : 'Bật để bắt đầu nhận chuyến',
-              style: AppTypography.caption.copyWith(color: AppColors.ink500),
-              textAlign: TextAlign.center,
-              maxLines: 2,
-              overflow: TextOverflow.ellipsis,
-            ),
-            const SizedBox(height: 14),
-            Transform.scale(
-              scale: 1.2,
-              child: CupertinoSwitch(
-                value: isOnline,
-                activeTrackColor: AppColors.primary500,
-                onChanged: disabled
-                    ? null
-                    : (_) {
-                        HapticFeedback.mediumImpact();
-                        onToggle();
-                      },
-              ),
+            const SizedBox(width: 10),
+            CupertinoSwitch(
+              value: isOnline,
+              activeTrackColor: AppColors.primary500,
+              onChanged: disabled
+                  ? null
+                  : (_) {
+                      HapticFeedback.mediumImpact();
+                      onToggle();
+                    },
             ),
           ],
         ),
