@@ -12,6 +12,7 @@ import '../../core/theme/app_shadows.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/format.dart';
 import '../../core/widgets/wg_button.dart';
+import '../../core/widgets/wg_phone_required_dialog.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../models/place.dart';
 import '../../models/scheduled_trip.dart';
@@ -300,6 +301,11 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
       WgToast.error(context, 'Bạn cần đăng nhập để đặt chuyến');
       return;
     }
+
+    // Phase 5P: same soft phone guard as Đặt ngay. Skips the network
+    // round-trip when the user picks "Để sau".
+    final hasPhone = await ensurePhoneOrPrompt(context, ref);
+    if (!hasPhone || !mounted) return;
 
     setState(() => _booking = true);
     try {

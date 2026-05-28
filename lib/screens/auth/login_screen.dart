@@ -62,15 +62,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   Future<void> _handleGoogle() async {
     setState(() => _googleLoading = true);
 
-    final error = await ref
+    final result = await ref
         .read(authStateProvider.notifier)
         .signInWithGoogleAndLogin(defaultRole: UserRole.passenger);
 
     if (!mounted) return;
     setState(() => _googleLoading = false);
 
-    if (error != null) {
-      WgToast.error(context, error);
+    if (result.error != null) {
+      WgToast.error(context, result.error!);
+      return;
+    }
+
+    // Phase 5P: Google-only accounts must add a phone before they can
+    // use the app, so divert to /complete-profile instead of /home.
+    if (result.needPhone) {
+      context.go('/complete-profile');
       return;
     }
 
