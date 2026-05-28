@@ -10,6 +10,7 @@ import 'package:phosphor_flutter/phosphor_flutter.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_typography.dart';
 import '../../core/utils/geohash_util.dart';
+import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../data/default_saved_places.dart';
 import '../../models/place.dart';
@@ -408,12 +409,33 @@ class _SavedPlaceRow extends ConsumerWidget {
     onSelect(picked);
   }
 
+  Future<void> _showInfoSheet(BuildContext context, Place place) async {
+    final picked = await showModalBottomSheet<Place>(
+      context: context,
+      backgroundColor: AppColors.white,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => _SavedPlaceInfoSheet(
+        savedPlace: savedPlace,
+        place: place,
+        tint: _tint,
+        icon: _icon,
+      ),
+    );
+    if (picked == null || !context.mounted) return;
+    onSelect(picked);
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final place = savedPlace.place;
     final hasPlace = place != null;
     return InkWell(
-      onTap: hasPlace ? () => onSelect(place) : () => _setupPersonal(context),
+      onTap: hasPlace
+          ? () => _showInfoSheet(context, place)
+          : () => _setupPersonal(context),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
@@ -463,6 +485,166 @@ class _SavedPlaceRow extends ConsumerWidget {
             ),
           ],
         ),
+      ),
+    );
+  }
+}
+
+/// Phase 5P: confirm sheet shown when the user taps a preset saved
+/// place (Aria, airport, city center…). Surfaces the full address +
+/// type label so the user can sanity-check before locking it in as the
+/// dropoff. Returning a [Place] via `Navigator.pop` lets the row know
+/// the user confirmed; popping with `null` means "cancelled".
+class _SavedPlaceInfoSheet extends StatelessWidget {
+  const _SavedPlaceInfoSheet({
+    required this.savedPlace,
+    required this.place,
+    required this.tint,
+    required this.icon,
+  });
+
+  final SavedPlace savedPlace;
+  final Place place;
+  final Color tint;
+  final IconData icon;
+
+  String get _typeLabel => switch (savedPlace.kind) {
+    SavedPlaceKind.home => 'Nhà',
+    SavedPlaceKind.work => 'Công ty',
+    SavedPlaceKind.airport => 'Sân bay',
+    SavedPlaceKind.city => 'Trung tâm thành phố',
+  };
+
+  @override
+  Widget build(BuildContext context) {
+    final bottomInset = MediaQuery.of(context).padding.bottom;
+    return Padding(
+      padding: EdgeInsets.fromLTRB(20, 12, 20, bottomInset + 20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.ink300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: tint.withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: tint, size: 24),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      savedPlace.label,
+                      style: AppTypography.h3.copyWith(
+                        fontWeight: FontWeight.w800,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      _typeLabel,
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink500,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: AppColors.ink50,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(
+                  PhosphorIconsRegular.mapPin,
+                  size: 18,
+                  color: AppColors.ink500,
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        place.name,
+                        style: AppTypography.body.copyWith(
+                          color: AppColors.ink900,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        place.address,
+                        style: AppTypography.caption.copyWith(
+                          color: AppColors.ink600,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '${place.lat.toStringAsFixed(4)}, '
+                        '${place.lng.toStringAsFixed(4)}',
+                        style: AppTypography.micro.copyWith(
+                          color: AppColors.ink400,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          WgButton.primary(
+            label: 'Chọn làm điểm đến',
+            size: WgButtonSize.lg,
+            isFullWidth: true,
+            trailingIcon: PhosphorIconsRegular.arrowRight,
+            onPressed: () => Navigator.pop(context, place),
+          ),
+          const SizedBox(height: 8),
+          Center(
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(
+                'Huỷ',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.ink500,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }

@@ -13,6 +13,7 @@ import '../../core/utils/polyline_fallback.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_draggable_sheet.dart';
 import '../../core/widgets/wg_glass.dart';
+import '../../core/widgets/wg_phone_required_dialog.dart';
 import '../../core/widgets/wg_recenter_fab.dart';
 import '../../core/widgets/wg_toast.dart';
 import '../../core/widgets/wg_trackasia_map.dart';
@@ -258,7 +259,7 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     );
   }
 
-  void _book({
+  Future<void> _book({
     required Place pickup,
     required Place dropoff,
     required TripType type,
@@ -267,7 +268,14 @@ class _RideOptionsScreenState extends ConsumerState<RideOptionsScreen> {
     required int durationMin,
     required LatLng pickupLatLng,
     required String pickupAddress,
-  }) {
+  }) async {
+    // Phase 5P: Google-only accounts may reach booking without a phone
+    // (e.g. session restored from an older signin). Gate every booking
+    // entry point with a soft prompt so the driver can always reach
+    // the passenger.
+    final ok = await ensurePhoneOrPrompt(context, ref);
+    if (!ok || !mounted) return;
+
     final extra = <String, Object>{
       'pickupLat': pickupLatLng.latitude,
       'pickupLng': pickupLatLng.longitude,

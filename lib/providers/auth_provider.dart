@@ -130,12 +130,14 @@ class AuthState extends _$AuthState {
   /// session. [defaultRole] is only used when this is a brand-new
   /// account; existing users keep whatever role they had.
   ///
-  /// Returns `null` on success, or a Vietnamese error message.
-  Future<String?> signInWithGoogleAndLogin({
+  /// Phase 5P: returns a record so callers can branch on whether the
+  /// signed-in user still needs to supply a phone number (we'd rather
+  /// surface the `/complete-profile` step than block sign-in).
+  Future<({String? error, bool needPhone})> signInWithGoogleAndLogin({
     required UserRole defaultRole,
   }) async {
     final result = await AuthService.signInWithGoogle();
-    if (!result.isSuccess) return result.error;
+    if (!result.isSuccess) return (error: result.error, needPhone: false);
 
     final firebaseUid = result.firebaseUid!;
     final email = result.email!;
@@ -198,9 +200,31 @@ class AuthState extends _$AuthState {
       await prefs.setString(_kPrefUserRole, user.role.name);
 
       state = AsyncData(user);
+      final needPhone = user.phone == null || user.phone!.trim().isEmpty;
+      return (error: null, needPhone: needPhone);
+    } catch (e) {
+      return (error: 'Lưu thông tin thất bại: $e', needPhone: false);
+    }
+  }
+
+  /// Phase 5P: persist the phone the user typed in CompleteProfile
+  /// after a successful Firebase phone-link. Refreshes [state] so any
+  /// `ref.watch` sees the new phone immediately.
+  Future<String?> updateUserPhone(String phoneE164) async {
+    final user = state.valueOrNull;
+    if (user == null) return 'Chưa đăng nhập';
+    try {
+      final mongo = ref.read(mongoServiceProvider);
+      final users = await mongo.users();
+      final now = DateTime.now().toUtc();
+      await users.updateOne(
+        where.eq('_id', ObjectId.fromHexString(user.id)),
+        modify.set('phone', phoneE164).set('updated_at', now),
+      );
+      state = AsyncData(user.copyWith(phone: phoneE164, updatedAt: now));
       return null;
     } catch (e) {
-      return 'Lưu thông tin thất bại: $e';
+      return 'Lưu số điện thoại thất bại: $e';
     }
   }
 

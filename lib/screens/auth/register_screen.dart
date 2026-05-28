@@ -73,15 +73,22 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
   Future<void> _handleGoogle() async {
     setState(() => _googleLoading = true);
 
-    final error = await ref
+    final result = await ref
         .read(authStateProvider.notifier)
         .signInWithGoogleAndLogin(defaultRole: _role);
 
     if (!mounted) return;
     setState(() => _googleLoading = false);
 
-    if (error != null) {
-      WgToast.error(context, error);
+    if (result.error != null) {
+      WgToast.error(context, result.error!);
+      return;
+    }
+
+    // Phase 5P: divert to CompleteProfile when the freshly-signed-in
+    // Google user has no phone yet.
+    if (result.needPhone) {
+      context.go('/complete-profile');
       return;
     }
 

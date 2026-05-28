@@ -8,6 +8,7 @@ import 'models/user.dart';
 import 'screens/_dev/matching_test_screen.dart';
 import 'screens/_dev/seed_screen.dart';
 import 'screens/_dev/showcase_screen.dart';
+import 'screens/auth/complete_profile_screen.dart';
 import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/auth/role_select_screen.dart';
@@ -82,6 +83,10 @@ GoRouter router(Ref ref) {
             role: extra['role'] as UserRole?,
           );
         },
+      ),
+      GoRoute(
+        path: '/complete-profile',
+        builder: (context, state) => const CompleteProfileScreen(),
       ),
 
       // ── Passenger shell — 5 tabs ──────────────────────────────────

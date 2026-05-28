@@ -16,6 +16,12 @@ class AuthService {
   static final _auth = FirebaseAuth.instance;
   static String? _verificationId;
 
+  /// Phase 5P: separate verification id slot for the "link phone to a
+  /// Google user" flow. We can't share [_verificationId] because the
+  /// CompleteProfile flow runs while a Google session is already alive,
+  /// and the user might still trigger a fresh sendOtp from elsewhere.
+  static String? _linkVerificationId;
+
   /// Scopes we actually use today — email lets us key Mongo users by
   /// address and avoid dup accounts; profile gives us the display name
   /// + avatar URL we render in the header.
@@ -106,7 +112,127 @@ class AuthService {
   /// account without showing the picker.
   static Future<void> signOut() async {
     _verificationId = null;
+    _linkVerificationId = null;
     await Future.wait([_auth.signOut(), _googleSignIn.signOut()]);
+  }
+
+  // ── Phase 5P: link phone to a Google-authenticated user ───────────
+
+  /// Phase 5P step 1: send an OTP SMS that will be used to LINK a phone
+  /// credential onto the current Firebase user (typically a Google
+  /// sign-in user with no phone yet). Mirrors [sendOtp] but caches the
+  /// verification id into [_linkVerificationId] so the verify call
+  /// links instead of signing-in.
+  static Future<AuthOtpResult> sendOtpForLink({
+    required String phoneNumber,
+  }) async {
+    final completer = Completer<AuthOtpResult>();
+    try {
+      await _auth.verifyPhoneNumber(
+        phoneNumber: phoneNumber,
+        timeout: const Duration(seconds: 60),
+        verificationCompleted: (PhoneAuthCredential credential) async {
+          // Android auto-verify path: link straight away so the user
+          // never has to type the SMS.
+          final linked = await _linkPhoneCredential(credential);
+          if (!completer.isCompleted) {
+            completer.complete(
+              linked.success
+                  ? AuthOtpResult.autoVerified()
+                  : AuthOtpResult.error(linked.error ?? 'Liên kết thất bại'),
+            );
+          }
+        },
+        verificationFailed: (FirebaseAuthException e) {
+          debugPrint('[auth-link] verificationFailed: ${e.code}');
+          if (!completer.isCompleted) {
+            completer.complete(AuthOtpResult.error(_mapSendError(e)));
+          }
+        },
+        codeSent: (String verificationId, int? resendToken) {
+          _linkVerificationId = verificationId;
+          if (!completer.isCompleted) {
+            completer.complete(AuthOtpResult.codeSent(verificationId));
+          }
+        },
+        codeAutoRetrievalTimeout: (String verificationId) {
+          _linkVerificationId = verificationId;
+        },
+      );
+      return await completer.future.timeout(
+        const Duration(seconds: 70),
+        onTimeout: () => AuthOtpResult.error('Hết thời gian gửi OTP'),
+      );
+    } catch (e) {
+      debugPrint('[auth-link] sendOtpForLink error: $e');
+      return AuthOtpResult.error('Lỗi không xác định: $e');
+    }
+  }
+
+  /// Phase 5P step 2: exchange the typed SMS for a [PhoneAuthCredential]
+  /// then link it to the current Firebase user. After this returns
+  /// successfully the firebase user has BOTH `google.com` and `phone`
+  /// providers, and `_auth.currentUser.phoneNumber` is populated.
+  static Future<({bool success, String? error})> verifyOtpAndLink({
+    required String otpCode,
+  }) async {
+    if (_linkVerificationId == null) {
+      return (
+        success: false,
+        error: 'Phiên OTP đã hết hạn, vui lòng gửi lại',
+      );
+    }
+    try {
+      final credential = PhoneAuthProvider.credential(
+        verificationId: _linkVerificationId!,
+        smsCode: otpCode,
+      );
+      return _linkPhoneCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      return (success: false, error: _mapVerifyError(e));
+    } catch (e) {
+      return (success: false, error: 'Lỗi không xác định: $e');
+    }
+  }
+
+  static Future<({bool success, String? error})> _linkPhoneCredential(
+    PhoneAuthCredential credential,
+  ) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return (success: false, error: 'Chưa đăng nhập, vui lòng thử lại');
+    }
+    try {
+      await user.linkWithCredential(credential);
+      _linkVerificationId = null;
+      return (success: true, error: null);
+    } on FirebaseAuthException catch (e) {
+      debugPrint('[auth-link] linkWithCredential error: ${e.code}');
+      // `provider-already-linked` is a no-op success: the phone was
+      // already attached to this firebase user from a previous attempt.
+      if (e.code == 'provider-already-linked') {
+        return (success: true, error: null);
+      }
+      return (success: false, error: _mapLinkError(e));
+    } catch (e) {
+      return (success: false, error: 'Lỗi không xác định: $e');
+    }
+  }
+
+  static String _mapLinkError(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'credential-already-in-use':
+        return 'Số điện thoại đã liên kết với tài khoản khác';
+      case 'invalid-verification-code':
+        return 'Mã OTP không đúng, kiểm tra lại';
+      case 'invalid-verification-id':
+      case 'session-expired':
+        return 'Phiên OTP đã hết hạn, gửi lại mã';
+      case 'requires-recent-login':
+        return 'Vui lòng đăng nhập lại để liên kết số điện thoại';
+      default:
+        return 'Lỗi liên kết: ${e.message ?? e.code}';
+    }
   }
 
   /// Trigger the native Google account picker → exchange the resulting
