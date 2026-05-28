@@ -267,7 +267,10 @@ class _MetricsCard extends StatelessWidget {
             crossAxisCount: 2,
             mainAxisSpacing: 12,
             crossAxisSpacing: 12,
-            childAspectRatio: 1.35,
+            // Phase 5O: 1.35 left ~26px of overflow because 3/4 tiles
+            // render the optional progress bar. 1.0 gives the tile
+            // enough vertical room for icon + h1 value + label + bar.
+            childAspectRatio: 1.0,
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             children: [
