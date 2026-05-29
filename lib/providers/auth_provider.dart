@@ -1,3 +1,5 @@
+import 'dart:developer' as developer;
+
 import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where, modify;
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -127,7 +129,15 @@ class AuthState extends _$AuthState {
       await prefs.setString(_kPrefUserId, user.id);
       await prefs.setString(_kPrefUserRole, user.role.name);
 
+      // Hotfix v4: nuke every user-scoped cache before publishing the
+      // new user. Without this the brief AsyncData(null) → AsyncData(B)
+      // transition could let a stale .valueOrNull from A's session
+      // slip through any keepAlive consumer that hasn't re-subscribed
+      // to authStateProvider.future yet.
+      _invalidateUserScopedCaches();
       state = AsyncData(user);
+      developer.log('[auth] LOGIN OTP user=${user.id} role=${user.role.name}',
+          name: 'auth');
       return null;
     } catch (e) {
       return 'Lưu thông tin thất bại: $e';
@@ -208,7 +218,13 @@ class AuthState extends _$AuthState {
       await prefs.setString(_kPrefUserId, user.id);
       await prefs.setString(_kPrefUserRole, user.role.name);
 
+      // Hotfix v4: same belt-and-braces invalidate as the OTP path.
+      _invalidateUserScopedCaches();
       state = AsyncData(user);
+      developer.log(
+        '[auth] LOGIN Google user=${user.id} role=${user.role.name}',
+        name: 'auth',
+      );
       final needPhone = user.phone == null || user.phone!.trim().isEmpty;
       return (error: null, needPhone: needPhone);
     } catch (e) {
@@ -277,14 +293,16 @@ class AuthState extends _$AuthState {
     await prefs.remove(_kPrefUserId);
     await prefs.remove(_kPrefUserRole);
     state = const AsyncData(null);
+    _invalidateUserScopedCaches();
+    developer.log('[auth] LOGOUT', name: 'auth');
+  }
 
-    // Hotfix v3: aggressive nuke of every user-scoped cache. Even
-    // though most async providers watch authStateProvider.future and
-    // should rebuild on user change, riverpod's keepAlive caches +
-    // the brief AsyncData(null) bridge between A and B can leave
-    // stale data visible if any consumer reads .valueOrNull during
-    // the transition. Invalidate every user-scoped provider explicitly
-    // so the next sign-in starts from a guaranteed-clean slate.
+  /// Hotfix v4: invalidate every user-scoped cache + clear every
+  /// keepAlive notifier holding the previous user's data. Called from
+  /// BOTH logout AND every login path so the brief AsyncData(null)
+  /// bridge between accounts can't leak stale .valueOrNull reads to a
+  /// keepAlive consumer that hasn't yet re-subscribed.
+  void _invalidateUserScopedCaches() {
     ref.invalidate(currentDriverProvider);
     ref.invalidate(upcomingScheduledTripsProvider);
     ref.invalidate(pastScheduledTripsProvider);
