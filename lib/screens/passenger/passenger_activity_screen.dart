@@ -626,12 +626,25 @@ class _PastScheduledCard extends StatelessWidget {
                   variant: WgBadgeVariant.shared,
                 ),
                 const SizedBox(width: 8),
-                WgStatusBadge(label: trip.statusLabel, tone: _tone),
-                const Spacer(),
-                Text(
-                  trip.scheduledAtVN,
-                  style: AppTypography.micro.copyWith(
-                    color: AppColors.ink500,
+                // Hotfix: long status labels ("Tài xế đã nhận") + long
+                // dates ("Thứ Hai, 28/05 • 08:00") used to push past the
+                // card edge. Flexible lets each shrink, the date scales
+                // before truncating so the time stays readable.
+                Flexible(
+                  child: WgStatusBadge(label: trip.statusLabel, tone: _tone),
+                ),
+                const SizedBox(width: 6),
+                Flexible(
+                  child: FittedBox(
+                    fit: BoxFit.scaleDown,
+                    alignment: Alignment.centerRight,
+                    child: Text(
+                      trip.scheduledAtVN,
+                      style: AppTypography.micro.copyWith(
+                        color: AppColors.ink500,
+                      ),
+                      maxLines: 1,
+                    ),
                   ),
                 ),
               ],

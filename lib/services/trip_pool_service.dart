@@ -111,7 +111,16 @@ class TripPoolService {
     final scheduledAtUtc = trip.scheduledAt.toUtc();
     final earliestAt = scheduledAtUtc.subtract(const Duration(minutes: 30));
     final latestAt = scheduledAtUtc.add(const Duration(minutes: 30));
-    final cancelDeadline = scheduledAtUtc.subtract(const Duration(hours: 1));
+    // Hotfix: the schedule screen only requires `scheduledAt > now + 30
+    // min`, so the naive "1 hour before scheduledAt" deadline lands in
+    // the past for any short-lead booking. The 60-second auto-cancel
+    // sweep then nukes the pool the moment it lands. Floor the deadline
+    // at "now + 10 min" so every new pool gets at least 10 minutes to
+    // gather passengers before it can be cancelled.
+    final rawDeadline = scheduledAtUtc.subtract(const Duration(hours: 1));
+    final minDeadline = now.add(const Duration(minutes: 10));
+    final cancelDeadline =
+        rawDeadline.isBefore(minDeadline) ? minDeadline : rawDeadline;
 
     // Rough estimate: scale the first booker's fare by min_threshold so
     // every passenger pays roughly the same share once full.
@@ -284,6 +293,17 @@ class TripPoolService {
     var cancelled = 0;
     for (final doc in docs) {
       final pool = TripPool.fromMongo(doc);
+      // Hotfix: don't cancel pools that were just created — gives the
+      // pool a 5-minute grace window even if the deadline check above
+      // matched (e.g. clock skew or stale documents).
+      if (now.difference(pool.createdAt.toUtc()) <
+          const Duration(minutes: 5)) {
+        developer.log(
+          '[pool] SKIP ${pool.poolCode}: within 5-min grace period',
+          name: 'pool',
+        );
+        continue;
+      }
       await col.updateOne(
         where.id(ObjectId.fromHexString(pool.id)),
         modify
@@ -293,8 +313,13 @@ class TripPoolService {
             .set('updated_at', now),
       );
       for (final tripId in pool.scheduledTripIds) {
+        // Hotfix safety: only cancel trips that are still pending. A
+        // trip that has already been picked up / completed shouldn't be
+        // reverted by a stale pool sweep.
         await tripsCol.updateOne(
-          where.id(ObjectId.fromHexString(tripId)),
+          where
+              .id(ObjectId.fromHexString(tripId))
+              .eq('status', ScheduledTripStatus.pending.mongoName),
           modify
               .set('status', ScheduledTripStatus.cancelled.mongoName)
               .set('cancelled_at', now)

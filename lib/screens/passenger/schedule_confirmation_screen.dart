@@ -82,7 +82,10 @@ class _Body extends StatelessWidget {
       child: Stack(
         children: [
           SingleChildScrollView(
-            padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 100),
+            // Hotfix: bumped from +100 to +120 so the bottom Row of
+            // buttons clears the PoolTrackingCard's extra height on
+            // smaller devices (was reporting "OVERFLOWED BY 13 PIXELS").
+            padding: EdgeInsets.fromLTRB(16, 12, 16, bottomInset + 120),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
