@@ -188,18 +188,23 @@ class _Body extends StatelessWidget {
             (_canCancel ? 100 : 24) + bottomInset,
           ),
           children: [
-            _StatusHeader(trip: trip),
-            if (trip.poolId != null) ...[
-              const SizedBox(height: 12),
-              PoolTrackingCard(poolId: trip.poolId!),
-            ],
-            // Phase 5R: free-point trips don't have a PoolTrackingCard,
-            // so once a driver accepts we surface their card here.
-            if (trip.poolId == null &&
-                trip.driverId != null &&
-                trip.status == ScheduledTripStatus.driverAssigned) ...[
-              const SizedBox(height: 12),
-              _AssignedDriverCard(driverId: trip.driverId!),
+            // Hotfix: for pooled (fixed-route) trips the pool is the
+            // authoritative status — the trip's own `status` field
+            // doesn't move when the pool gets assigned, so legacy data
+            // with a stale `noDriverFound` value was painting a red
+            // "Không tìm được tài xế" banner on top of a live green
+            // "Đang gom khách" card. Pooled trips render the
+            // PoolTrackingCard only; free-point trips keep the
+            // existing status header + AssignedDriverCard combo.
+            if (trip.poolId != null)
+              PoolTrackingCard(poolId: trip.poolId!)
+            else ...[
+              _StatusHeader(trip: trip),
+              if (trip.driverId != null &&
+                  trip.status == ScheduledTripStatus.driverAssigned) ...[
+                const SizedBox(height: 12),
+                _AssignedDriverCard(driverId: trip.driverId!),
+              ],
             ],
             const SizedBox(height: 12),
             _CodeRow(trip: trip, onCopy: onCopyCode),

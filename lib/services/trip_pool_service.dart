@@ -251,6 +251,7 @@ class TripPoolService {
       return false;
     }
 
+    final now = DateTime.now().toUtc();
     final res = await col.updateOne(
       where
           .id(ObjectId.fromHexString(poolId))
@@ -259,7 +260,7 @@ class TripPoolService {
           .set('driver_id', ObjectId.fromHexString(driverId))
           .set('driver_vehicle_id', ObjectId.fromHexString(vehicle.id))
           .set('status', TripPoolStatus.assigned.mongoName)
-          .set('updated_at', DateTime.now().toUtc()),
+          .set('updated_at', now),
     );
     final ok = res.isSuccess && res.nModified > 0;
     developer.log(
@@ -268,6 +269,37 @@ class TripPoolService {
           : '[pool] LOST ${pool.poolCode} — another driver grabbed it',
       name: 'pool',
     );
+
+    if (ok) {
+      // Hotfix: cascade the assignment down to every member scheduled
+      // trip so the customer's "Chi tiết chuyến đặt" reflects the
+      // driver pick-up. Without this the pool flipped to assigned but
+      // each member trip stayed in `pending` / `noDriverFound`, which
+      // is what produced the contradictory red status banner on top
+      // of the green pool card. We also flip any stale `noDriverFound`
+      // values that were stamped by the old autoCancelExpiredSearches
+      // race — they're safe to overwrite now that this trip is taken.
+      final tripsCol = await _mongo.scheduledTrips();
+      for (final tripId in pool.scheduledTripIds) {
+        await tripsCol.updateOne(
+          where.id(ObjectId.fromHexString(tripId)),
+          modify
+              .set(
+                'status',
+                ScheduledTripStatus.driverAssigned.mongoName,
+              )
+              .set('driver_id', ObjectId.fromHexString(driverId))
+              .set('cancelled_at', null)
+              .set('cancelled_by', null)
+              .set('cancel_reason', null)
+              .set('updated_at', now),
+        );
+      }
+      developer.log(
+        '[pool] cascaded assignment to ${pool.scheduledTripIds.length} trips',
+        name: 'pool',
+      );
+    }
     return ok;
   }
 
