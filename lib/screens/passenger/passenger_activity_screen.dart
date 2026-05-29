@@ -158,12 +158,14 @@ class _ScheduledTripCard extends StatelessWidget {
 
   WgStatusTone get _tone => switch (trip.status) {
     ScheduledTripStatus.pending => WgStatusTone.warning,
+    ScheduledTripStatus.offered ||
     ScheduledTripStatus.matched ||
     ScheduledTripStatus.driverAssigned ||
     ScheduledTripStatus.started => WgStatusTone.info,
     ScheduledTripStatus.completed => WgStatusTone.success,
     ScheduledTripStatus.cancelled ||
-    ScheduledTripStatus.expired => WgStatusTone.danger,
+    ScheduledTripStatus.expired ||
+    ScheduledTripStatus.noDriverFound => WgStatusTone.danger,
   };
 
   @override

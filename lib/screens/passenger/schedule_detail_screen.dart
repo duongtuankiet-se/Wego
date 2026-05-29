@@ -14,7 +14,9 @@ import '../../core/utils/format.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_status_badge.dart';
 import '../../core/widgets/wg_toast.dart';
+import '../../models/driver.dart';
 import '../../models/scheduled_trip.dart';
+import '../../providers/driver_provider.dart';
 import '../../providers/scheduled_trips_provider.dart';
 import '_widgets/pool_tracking_card.dart';
 
@@ -100,7 +102,9 @@ class _ScheduleDetailScreenState extends ConsumerState<ScheduleDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final tripAsync = ref.watch(scheduledTripDetailProvider(widget.tripId));
+    // Phase 5R: polling watcher so the status banner + driver card
+    // reflect pending → offered → driverAssigned without manual refresh.
+    final tripAsync = ref.watch(scheduledTripWatcherProvider(widget.tripId));
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -167,6 +171,7 @@ class _Body extends StatelessWidget {
 
   bool get _canCancel =>
       trip.status == ScheduledTripStatus.pending ||
+      trip.status == ScheduledTripStatus.offered ||
       trip.status == ScheduledTripStatus.matched ||
       trip.status == ScheduledTripStatus.driverAssigned;
 
@@ -187,6 +192,14 @@ class _Body extends StatelessWidget {
             if (trip.poolId != null) ...[
               const SizedBox(height: 12),
               PoolTrackingCard(poolId: trip.poolId!),
+            ],
+            // Phase 5R: free-point trips don't have a PoolTrackingCard,
+            // so once a driver accepts we surface their card here.
+            if (trip.poolId == null &&
+                trip.driverId != null &&
+                trip.status == ScheduledTripStatus.driverAssigned) ...[
+              const SizedBox(height: 12),
+              _AssignedDriverCard(driverId: trip.driverId!),
             ],
             const SizedBox(height: 12),
             _CodeRow(trip: trip, onCopy: onCopyCode),
@@ -229,12 +242,14 @@ class _StatusHeader extends StatelessWidget {
 
   WgStatusTone get _tone => switch (trip.status) {
     ScheduledTripStatus.pending => WgStatusTone.warning,
+    ScheduledTripStatus.offered ||
     ScheduledTripStatus.matched ||
     ScheduledTripStatus.driverAssigned ||
     ScheduledTripStatus.started => WgStatusTone.info,
     ScheduledTripStatus.completed => WgStatusTone.success,
     ScheduledTripStatus.cancelled ||
-    ScheduledTripStatus.expired => WgStatusTone.danger,
+    ScheduledTripStatus.expired ||
+    ScheduledTripStatus.noDriverFound => WgStatusTone.danger,
   };
 
   @override
@@ -251,6 +266,7 @@ class _StatusHeader extends StatelessWidget {
           WgStatusBadge(label: trip.statusLabel, tone: _tone),
           const Spacer(),
           if (trip.status == ScheduledTripStatus.pending ||
+              trip.status == ScheduledTripStatus.offered ||
               trip.status == ScheduledTripStatus.matched ||
               trip.status == ScheduledTripStatus.driverAssigned)
             Text(
@@ -613,6 +629,177 @@ class _FareBlock extends StatelessWidget {
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Phase 5R: once a driver accepts a free-point scheduled trip, show
+/// their card (name, vehicle plate, rating). Pool trips get the
+/// [PoolTrackingCard] instead so we never render both.
+class _AssignedDriverCard extends ConsumerWidget {
+  const _AssignedDriverCard({required this.driverId});
+  final String driverId;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final driverAsync = ref.watch(driverByIdProvider(driverId));
+    return driverAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (driver) =>
+          driver == null ? const SizedBox.shrink() : _Card(driver: driver),
+    );
+  }
+}
+
+class _Card extends StatelessWidget {
+  const _Card({required this.driver});
+  final Driver driver;
+
+  void _call(BuildContext context) {
+    HapticFeedback.mediumImpact();
+    WgToast.info(context, 'Đang kết nối với ${driver.name ?? "tài xế"}…');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        gradient: const LinearGradient(
+          colors: [AppColors.primary500, AppColors.primary700],
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+        ),
+        borderRadius: AppRadius.card,
+        boxShadow: AppShadows.heroGlow(AppColors.primary500),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(
+                PhosphorIconsFill.checkCircle,
+                color: AppColors.white,
+                size: 20,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                'Đã tìm thấy tài xế!',
+                style: AppTypography.body.copyWith(
+                  color: AppColors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 14),
+          Row(
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: AppColors.white.withValues(alpha: 0.22),
+                  shape: BoxShape.circle,
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  (driver.name ?? 'TX').characters.first.toUpperCase(),
+                  style: AppTypography.h3.copyWith(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      driver.name ?? 'Tài xế WeGo',
+                      style: AppTypography.bodyLarge.copyWith(
+                        color: AppColors.white,
+                        fontWeight: FontWeight.w700,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Row(
+                      children: [
+                        const Icon(
+                          PhosphorIconsFill.star,
+                          color: AppColors.warning,
+                          size: 14,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${driver.ratingAvg.toStringAsFixed(2)} · '
+                          '${driver.totalTrips} chuyến',
+                          style: AppTypography.caption.copyWith(
+                            color: AppColors.white.withValues(alpha: 0.9),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Material(
+                color: AppColors.white,
+                shape: const CircleBorder(),
+                child: InkWell(
+                  onTap: () => _call(context),
+                  customBorder: const CircleBorder(),
+                  child: const SizedBox(
+                    width: 40,
+                    height: 40,
+                    child: Icon(
+                      PhosphorIconsFill.phone,
+                      color: AppColors.primary600,
+                      size: 18,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.white.withValues(alpha: 0.18),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${driver.vehicleModel ?? "—"} · '
+                    '${driver.vehicleColor ?? "—"}',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.white.withValues(alpha: 0.9),
+                    ),
+                  ),
+                ),
+                Text(
+                  driver.vehiclePlate ?? '—',
+                  style: AppTypography.bodyLarge.copyWith(
+                    color: AppColors.white,
+                    fontWeight: FontWeight.w800,
+                    fontFamily: 'monospace',
+                    letterSpacing: 1.2,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

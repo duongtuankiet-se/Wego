@@ -133,6 +133,12 @@ class ScheduledTripService {
       'driver_id': null,
       'mode': mode == ScheduleMode.fixedRoute ? 'fixed_route' : 'free_point',
       'route_id': route == null ? null : ObjectId.fromHexString(route.id),
+      // Phase 5R offer-engine bookkeeping. Pool trips set these too but
+      // the search job ignores them (pool flow runs the assignment).
+      'offered_to_drivers': <ObjectId>[],
+      'rejected_by_drivers': <ObjectId>[],
+      'offer_attempts': 0,
+      'search_timeout_at': now.add(const Duration(minutes: 10)),
       'cancelled_at': null,
       'cancelled_by': null,
       'cancel_reason': null,
@@ -319,8 +325,11 @@ class ScheduledTripService {
     return doc == null ? null : ScheduledTrip.fromMongo(doc);
   }
 
-  /// All pending scheduled trips within [limitHours] from now. Driver
-  /// home uses this to show "Chuyến sắp tới" the driver can accept.
+  /// All pending free-point scheduled trips within [limitHours] from
+  /// now. Driver home uses this to show "Chuyến sắp tới" the driver can
+  /// accept from a list. Phase 5R: pool trips (`pool_id != null`) are
+  /// skipped since the pool flow runs their assignment via
+  /// [TripPoolService.driverAcceptPool] on `DriverPoolsScreen`.
   Future<List<ScheduledTrip>> getUpcomingTripsForDriver({
     int limitHours = 48,
   }) async {
@@ -332,6 +341,7 @@ class ScheduledTripService {
       where
           .raw(<String, dynamic>{
             'status': 'pending',
+            'pool_id': null,
             'scheduled_at': {r'$gte': now, r'$lte': until},
           })
           .sortBy('scheduled_at')

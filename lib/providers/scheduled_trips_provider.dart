@@ -39,6 +39,20 @@ Future<List<ScheduledTrip>> pastScheduledTrips(Ref ref) async {
 Future<ScheduledTrip?> scheduledTripDetail(Ref ref, String tripId) =>
     ref.watch(scheduledTripServiceProvider).getById(tripId);
 
+/// Phase 5R: live-polling variant of [scheduledTripDetailProvider]. Used
+/// by the customer waiting screen so the status banner reflects
+/// pending → offered → driverAssigned without manual refresh. Polls
+/// every 5s — same cadence as the pool tracker so customers never see
+/// a stale snapshot longer than that.
+@riverpod
+Stream<ScheduledTrip?> scheduledTripWatcher(Ref ref, String tripId) async* {
+  final svc = ref.watch(scheduledTripServiceProvider);
+  yield await svc.getById(tripId);
+  await for (final _ in Stream<void>.periodic(const Duration(seconds: 5))) {
+    yield await svc.getById(tripId);
+  }
+}
+
 @riverpod
 Future<List<ScheduledTrip>> driverUpcomingTrips(Ref ref) =>
     ref.watch(scheduledTripServiceProvider).getUpcomingTripsForDriver();

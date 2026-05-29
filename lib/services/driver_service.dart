@@ -59,6 +59,17 @@ class DriverService {
     return doc == null ? null : Driver.fromMongo(doc);
   }
 
+  /// Phase 5R: lookup by driver `_id` (not user_id) for screens that
+  /// hold a `driver_id` from a trip and need to display the assigned
+  /// driver's profile.
+  Future<Driver?> getById(String driverId) async {
+    final coll = await _mongo.drivers();
+    final doc = await coll.findOne(
+      where.eq('_id', ObjectId.fromHexString(driverId)),
+    );
+    return doc == null ? null : Driver.fromMongo(doc);
+  }
+
   /// Lightweight write of just the driver's current position + geohash.
   /// Use from the navigation screen on a 3-second throttle.
   Future<void> updateDriverLocation({

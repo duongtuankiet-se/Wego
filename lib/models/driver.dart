@@ -25,6 +25,12 @@ class Driver with _$Driver {
     double? currentLat,
     double? currentLng,
     String? currentGeohash,
+    // ── Phase 5R: outstanding trip offer ─────────────────────────────
+    // When non-null the driver is currently considering a 15s offer
+    // for the referenced scheduled trip. Used as the atomic "busy with
+    // offer" signal so the search job doesn't double-book them.
+    String? currentOfferTripId,
+    DateTime? currentOfferExpiresAt,
     required DateTime createdAt,
     required DateTime updatedAt,
   }) = _Driver;
@@ -48,6 +54,9 @@ class Driver with _$Driver {
     currentLat: (doc['current_lat'] as num?)?.toDouble(),
     currentLng: (doc['current_lng'] as num?)?.toDouble(),
     currentGeohash: doc['current_geohash'] as String?,
+    currentOfferTripId: (doc['current_offer_trip_id'] as ObjectId?)?.oid,
+    currentOfferExpiresAt:
+        (doc['current_offer_expires_at'] as DateTime?)?.toLocal(),
     createdAt: doc['created_at'] as DateTime,
     updatedAt: doc['updated_at'] as DateTime,
   );

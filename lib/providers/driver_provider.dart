@@ -15,3 +15,11 @@ Future<Driver?> currentDriver(Ref ref) async {
   if (user == null) return null;
   return ref.watch(driverServiceProvider).getDriverForUser(user.id);
 }
+
+/// Phase 5R: look up any driver by id. Used by the passenger waiting
+/// screen once a scheduled trip has been assigned, to surface the
+/// driver's name + vehicle plate + rating without dragging in the
+/// full ActiveDriver/CurrentTrip plumbing.
+@riverpod
+Future<Driver?> driverById(Ref ref, String driverId) =>
+    ref.watch(driverServiceProvider).getById(driverId);

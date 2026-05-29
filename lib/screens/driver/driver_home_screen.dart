@@ -29,9 +29,12 @@ import '../../providers/incoming_trip_provider.dart';
 import '../../providers/location_provider.dart';
 import '../../providers/notifications_provider.dart';
 import '../../providers/scheduled_trips_provider.dart';
+import '../../providers/trip_offer_provider.dart';
 import '../../providers/trip_service_provider.dart';
+import '../../services/trip_offer_service.dart';
 import '_widgets/driver_stats_strip.dart';
 import '_widgets/incoming_trip_modal.dart';
+import '_widgets/trip_offer_popup.dart';
 
 class DriverHomeScreen extends ConsumerStatefulWidget {
   const DriverHomeScreen({super.key});
@@ -44,6 +47,10 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
   MapLibreMapController? _map;
   bool _modalOpen = false;
   String? _lastHandledOfferId;
+  // Phase 5R: dedupe popup across rapid 5s poll ticks so we don't stack
+  // dialogs on top of each other while the driver is still answering.
+  bool _offerPopupOpen = false;
+  String? _lastOfferedTripId;
 
   @override
   void dispose() {
@@ -73,6 +80,27 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       if (!mounted) return;
       WgToast.info(context, 'Đã từ chối — đang tìm chuyến khác...');
       ref.invalidate(incomingTripPollProvider);
+    }
+  }
+
+  Future<void> _handleScheduledOffer(
+    ScheduledTrip trip,
+    int secondsLeft,
+  ) async {
+    if (_offerPopupOpen || _lastOfferedTripId == trip.id) return;
+    _lastOfferedTripId = trip.id;
+    _offerPopupOpen = true;
+    final accepted = await TripOfferPopup.show(
+      context,
+      trip: trip,
+      initialSecondsLeft: secondsLeft,
+    );
+    _offerPopupOpen = false;
+    if (!mounted) return;
+    if (!accepted) {
+      // Re-arm the dedup key so a re-offer of the same trip after the
+      // driver has fully cleared their queue can still show.
+      _lastOfferedTripId = null;
     }
   }
 
@@ -136,6 +164,19 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       final offer = next.valueOrNull;
       if (offer != null && offer.tripId != null) {
         _handleIncomingOffer(offer);
+      }
+    });
+
+    // Phase 5R: scheduled-trip offer popup. Fires whenever the polling
+    // provider yields a non-empty offer that we haven't already shown.
+    ref.listen<AsyncValue<CurrentOffer>>(driverCurrentOfferProvider, (
+      prev,
+      next,
+    ) {
+      final offer = next.valueOrNull;
+      final trip = offer?.trip;
+      if (trip != null) {
+        _handleScheduledOffer(trip, offer!.secondsLeft);
       }
     });
 
