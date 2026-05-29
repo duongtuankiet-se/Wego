@@ -25,6 +25,13 @@ class Notifications extends _$Notifications {
   void clearAll() {
     state = const [];
   }
+
+  /// Hotfix: keepAlive notifications survive logout because the data is
+  /// mock and not user-scoped. Reset back to seed when a user logs out
+  /// so the next signed-in user doesn't inherit the previous bell badge.
+  void reset() {
+    state = generateMockNotifications();
+  }
 }
 
 /// Derived: number of unread items. Exposed as a separate provider so
