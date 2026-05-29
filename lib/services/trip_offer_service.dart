@@ -381,8 +381,20 @@ class TripOfferService {
 
     for (final doc in docs) {
       final tripObjId = doc['_id'] as ObjectId;
+      // Hotfix: was unconditional set-to-noDriverFound — between the
+      // initial find() and this updateOne(), a driver could accept
+      // (status → driver_assigned) and we'd overwrite it. Lock the
+      // where-clause to status IN [pending, offered] so the cascade
+      // only fires when the trip is still genuinely unassigned. This
+      // is why the customer was seeing "Không tìm được tài xế" on
+      // trips a driver had actually picked up.
       await tripsCol.updateOne(
-        where.eq('_id', tripObjId),
+        where.raw(<String, dynamic>{
+          '_id': tripObjId,
+          'status': {
+            r'$in': ['pending', 'offered'],
+          },
+        }),
         modify
             .set('status', ScheduledTripStatus.noDriverFound.mongoName)
             .set('current_offered_driver_id', null)
