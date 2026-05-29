@@ -21,12 +21,20 @@ enum ScheduleMode { freePoint, fixedRoute }
 
 enum ScheduledTripStatus {
   pending,
+  // Phase 5R: a specific driver currently holds a 15s offer for this
+  // trip. Status flips back to `pending` if they reject/timeout, or
+  // forward to `driverAssigned` on accept.
+  offered,
   matched,
   driverAssigned,
   started,
   completed,
   cancelled,
   expired,
+  // Phase 5R: search_timeout_at elapsed with no driver accepting any
+  // offer. Trip is effectively cancelled but kept distinct so analytics
+  // can tell "no supply" from "user cancelled".
+  noDriverFound,
 }
 
 /// Status name as stored in Mongo — uses snake_case for the multi-word
@@ -34,16 +42,19 @@ enum ScheduledTripStatus {
 extension ScheduledTripStatusMongo on ScheduledTripStatus {
   String get mongoName => switch (this) {
     ScheduledTripStatus.driverAssigned => 'driver_assigned',
+    ScheduledTripStatus.noDriverFound => 'no_driver_found',
     _ => name,
   };
 
   static ScheduledTripStatus fromMongo(String? raw) => switch (raw) {
     'driver_assigned' => ScheduledTripStatus.driverAssigned,
+    'offered' => ScheduledTripStatus.offered,
     'matched' => ScheduledTripStatus.matched,
     'started' => ScheduledTripStatus.started,
     'completed' => ScheduledTripStatus.completed,
     'cancelled' => ScheduledTripStatus.cancelled,
     'expired' => ScheduledTripStatus.expired,
+    'no_driver_found' => ScheduledTripStatus.noDriverFound,
     _ => ScheduledTripStatus.pending,
   };
 }
@@ -98,6 +109,17 @@ class ScheduledTrip with _$ScheduledTrip {
     String? poolId,
     String? routeId,
     @Default(ScheduleMode.freePoint) ScheduleMode mode,
+    // ── Phase 5R offer-engine bookkeeping ───────────────────────────
+    @Default(<String>[]) List<String> offeredToDrivers,
+    @Default(<String>[]) List<String> rejectedByDrivers,
+    @Default(0) int offerAttempts,
+    DateTime? searchTimeoutAt,
+    // Phase 5R hotfix: per-offer marker on the trip itself so
+    // acceptOffer can guard "this offer is for ME and still alive"
+    // in a single atomic where-clause. Cleared on accept / reject /
+    // expire / search-cancel.
+    String? currentOfferedDriverId,
+    DateTime? currentOfferExpiresAt,
     DateTime? cancelledAt,
     String? cancelledBy,
     String? cancelReason,
@@ -134,12 +156,14 @@ class ScheduledTrip with _$ScheduledTrip {
 
   String get statusLabel => switch (status) {
     ScheduledTripStatus.pending => 'Đang tìm tài xế',
+    ScheduledTripStatus.offered => 'Có tài xế đang xem',
     ScheduledTripStatus.matched => 'Đã ghép tuyến',
     ScheduledTripStatus.driverAssigned => 'Tài xế đã nhận',
     ScheduledTripStatus.started => 'Đang chạy',
     ScheduledTripStatus.completed => 'Hoàn thành',
     ScheduledTripStatus.cancelled => 'Đã huỷ',
     ScheduledTripStatus.expired => 'Quá giờ',
+    ScheduledTripStatus.noDriverFound => 'Không tìm được tài xế',
   };
 
   static ScheduledTrip fromMongo(Map<String, dynamic> doc) => ScheduledTrip(
@@ -186,6 +210,18 @@ class ScheduledTrip with _$ScheduledTrip {
     mode: (doc['mode'] as String?) == 'fixed_route'
         ? ScheduleMode.fixedRoute
         : ScheduleMode.freePoint,
+    offeredToDrivers: ((doc['offered_to_drivers'] as List?) ?? const [])
+        .map((id) => (id as ObjectId).oid)
+        .toList(growable: false),
+    rejectedByDrivers: ((doc['rejected_by_drivers'] as List?) ?? const [])
+        .map((id) => (id as ObjectId).oid)
+        .toList(growable: false),
+    offerAttempts: (doc['offer_attempts'] as num?)?.toInt() ?? 0,
+    searchTimeoutAt: (doc['search_timeout_at'] as DateTime?)?.toLocal(),
+    currentOfferedDriverId:
+        (doc['current_offered_driver_id'] as ObjectId?)?.oid,
+    currentOfferExpiresAt:
+        (doc['current_offer_expires_at'] as DateTime?)?.toLocal(),
     cancelledAt: (doc['cancelled_at'] as DateTime?)?.toLocal(),
     cancelledBy: doc['cancelled_by'] as String?,
     cancelReason: doc['cancel_reason'] as String?,
