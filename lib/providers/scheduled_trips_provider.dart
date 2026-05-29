@@ -6,11 +6,13 @@ import 'package:maplibre_gl/maplibre_gl.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
 import '../core/utils/geohash_util.dart';
+import '../models/route.dart';
 import '../models/scheduled_trip.dart';
 import '../services/directions_service.dart';
 import '../services/scheduled_trip_service.dart';
 import 'auth_provider.dart';
 import 'mongo_provider.dart';
+import 'routes_provider.dart';
 
 part 'scheduled_trips_provider.freezed.dart';
 part 'scheduled_trips_provider.g.dart';
@@ -48,6 +50,9 @@ Future<List<ScheduledTrip>> driverUpcomingTrips(Ref ref) =>
 @freezed
 class ScheduleRideFormState with _$ScheduleRideFormState {
   const factory ScheduleRideFormState({
+    @Default(ScheduleMode.freePoint) ScheduleMode mode,
+    RoutePreset? selectedRoute,
+    RoutePreset? suggestedRoute,
     ScheduledTripLocation? pickup,
     ScheduledTripLocation? dropoff,
     @Default(<ScheduledTripLocation>[]) List<ScheduledTripLocation> waypoints,
@@ -91,6 +96,47 @@ class ScheduleRideForm extends _$ScheduleRideForm {
     return const ScheduleRideFormState();
   }
 
+  // Phase 5Q dual-mode setters ──────────────────────────────────────
+
+  /// Switch between freePoint (per-km, no pool) and fixedRoute (flat
+  /// fare from a [RoutePreset], pool engine enabled). Resets pickup/
+  /// dropoff/fare to avoid carrying stale data from the other mode.
+  void setMode(ScheduleMode mode) {
+    if (state.mode == mode) return;
+    _recalcDebouncer?.cancel();
+    state = state.copyWith(
+      mode: mode,
+      selectedRoute: null,
+      suggestedRoute: null,
+      pickup: null,
+      dropoff: null,
+      baseFare: 0,
+      estimatedFare: 0,
+      discount: 0,
+      estimatedDistanceKm: 0,
+      estimatedDurationMin: 0,
+      isCalculating: false,
+    );
+  }
+
+  void setSelectedRoute(RoutePreset? route) {
+    state = state.copyWith(
+      selectedRoute: route,
+      pickup: null,
+      dropoff: null,
+    );
+    _recalcFareFromRoute();
+  }
+
+  /// Customer tapped "Đổi" on the upsell banner: flip to fixedRoute
+  /// + select the suggested route in one shot.
+  void acceptUpsellRoute() {
+    final s = state.suggestedRoute;
+    if (s == null) return;
+    setMode(ScheduleMode.fixedRoute);
+    setSelectedRoute(s);
+  }
+
   void setPickup(ScheduledTripLocation? loc) {
     state = state.copyWith(pickup: loc);
     _scheduleRecalc();
@@ -107,7 +153,14 @@ class ScheduleRideForm extends _$ScheduleRideForm {
 
   void setPassengerCount(int count) {
     state = state.copyWith(passengerCount: count.clamp(1, 4));
-    _recalcLocally();
+    // Phase 5Q: pax change re-derives flat fare immediately when
+    // we're on a fixed route; free-point just refreshes the locally
+    // computed discount layer.
+    if (state.mode == ScheduleMode.fixedRoute) {
+      _recalcFareFromRoute();
+    } else {
+      _recalcLocally();
+    }
   }
 
   void setLuggage(LuggageType l) {
@@ -116,7 +169,11 @@ class ScheduleRideForm extends _$ScheduleRideForm {
 
   void setRideType(String type) {
     state = state.copyWith(rideType: type, allowPooling: type == 'shared');
-    _recalcLocally();
+    if (state.mode == ScheduleMode.fixedRoute) {
+      _recalcFareFromRoute();
+    } else {
+      _recalcLocally();
+    }
   }
 
   void setAllowPooling(bool v) {
@@ -191,15 +248,48 @@ class ScheduleRideForm extends _$ScheduleRideForm {
     );
   }
 
-  /// Schedules a debounced fare recalc. Subsequent calls within 800ms
-  /// supersede each other so the Directions API only fires once after
-  /// the user stops editing pickup/dropoff.
+  /// Phase 5Q routing: fixed-route flat-fare recompute is instant
+  /// (no network), free-point still goes through the 800ms debounce
+  /// before hitting Directions.
   void _scheduleRecalc() {
-    if (state.pickup == null || state.dropoff == null) return;
     _recalcDebouncer?.cancel();
+    if (state.mode == ScheduleMode.fixedRoute) {
+      _recalcFareFromRoute();
+      return;
+    }
+    if (state.pickup == null || state.dropoff == null) return;
     _recalcDebouncer = Timer(
       const Duration(milliseconds: 800),
       _doRecalcFare,
+    );
+  }
+
+  /// Compute flat fare from the [RoutePreset] price table. Honors the
+  /// shared/private split and stacks the existing ≥3-pax + promo
+  /// discounts on top.
+  void _recalcFareFromRoute() {
+    final s = state;
+    final route = s.selectedRoute;
+    if (route == null) return;
+    final isPrivate = s.rideType == 'private';
+    final baseFare = isPrivate
+        ? route.baseFarePrivate
+        : route.baseFareCarpool * s.passengerCount;
+
+    final svc = ref.read(scheduledTripServiceProvider);
+    final discount = svc.previewDiscount(
+      baseFare: baseFare,
+      passengerCount: s.passengerCount,
+      promoCode: s.promoIsValid ? s.promoCode : null,
+    );
+
+    state = s.copyWith(
+      baseFare: baseFare,
+      discount: discount,
+      estimatedFare: baseFare - discount,
+      estimatedDistanceKm: route.distanceKm.toDouble(),
+      estimatedDurationMin: route.durationMin,
+      isCalculating: false,
     );
   }
 
@@ -252,5 +342,51 @@ class ScheduleRideForm extends _$ScheduleRideForm {
       estimatedFare: baseFare - discount,
       isCalculating: false,
     );
+
+    // Phase 5Q: after free-point fare lands, look for a matching
+    // preset route so the UI can pop a flat-fare upsell banner.
+    unawaited(_checkRouteUpsell());
+  }
+
+  /// Phase 5Q: free-point booking might align with one of the preset
+  /// corridors (e.g. user typed Đà Nẵng → Hội An by hand). When it
+  /// does, surface a "Có tuyến cố định" banner so they can switch
+  /// over to the flat fare.
+  Future<void> _checkRouteUpsell() async {
+    final s = state;
+    if (s.mode != ScheduleMode.freePoint) return;
+    if (s.pickup == null || s.dropoff == null) {
+      if (s.suggestedRoute != null) {
+        state = s.copyWith(suggestedRoute: null);
+      }
+      return;
+    }
+    final pickupCity = _extractCity(s.pickup!.address);
+    final dropoffCity = _extractCity(s.dropoff!.address);
+    if (pickupCity == null ||
+        dropoffCity == null ||
+        pickupCity == dropoffCity) {
+      if (s.suggestedRoute != null) {
+        state = s.copyWith(suggestedRoute: null);
+      }
+      return;
+    }
+    try {
+      final route = await ref
+          .read(routeServiceProvider)
+          .findByEndpoints(pickupCity: pickupCity, dropoffCity: dropoffCity);
+      state = state.copyWith(suggestedRoute: route);
+    } catch (_) {
+      // Upsell is best-effort; never let it break booking.
+    }
+  }
+
+  String? _extractCity(String address) {
+    final parts = address
+        .split(',')
+        .map((p) => p.trim())
+        .where((p) => p.isNotEmpty)
+        .toList();
+    return parts.isEmpty ? null : parts.last;
   }
 }

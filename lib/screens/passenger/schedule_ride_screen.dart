@@ -19,6 +19,9 @@ import '../../models/scheduled_trip.dart';
 import '../../providers/auth_provider.dart';
 import '../../providers/scheduled_trips_provider.dart';
 import '../../providers/selected_destination_provider.dart';
+import '_widgets/route_picker_sheet.dart';
+import '_widgets/route_upsell_banner.dart';
+import '_widgets/schedule_mode_toggle.dart';
 
 class ScheduleRideScreen extends ConsumerStatefulWidget {
   const ScheduleRideScreen({super.key});
@@ -279,6 +282,11 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
   Future<void> _book() async {
     final form = ref.read(scheduleRideFormProvider);
 
+    // Phase 5Q: fixedRoute bookings need a route picked before pickup.
+    if (form.mode == ScheduleMode.fixedRoute && form.selectedRoute == null) {
+      WgToast.error(context, 'Vui lòng chọn tuyến đường');
+      return;
+    }
     if (form.pickup == null) {
       WgToast.error(context, 'Vui lòng chọn điểm đón');
       return;
@@ -329,6 +337,10 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
         promoCode: form.promoIsValid ? form.promoCode : null,
         estimatedDistanceKm: form.estimatedDistanceKm,
         estimatedDurationMin: form.estimatedDurationMin,
+        // Phase 5Q: pass mode + route so the service can pick flat
+        // vs per-km fare and gate the pool engine.
+        mode: form.mode,
+        route: form.selectedRoute,
       );
       ref.invalidate(upcomingScheduledTripsProvider);
       if (!mounted) return;
@@ -362,7 +374,18 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
       body: ListView(
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
         children: [
+          const ScheduleModeToggle(),
+          const SizedBox(height: 12),
+          if (form.mode == ScheduleMode.fixedRoute) ...[
+            _buildRouteSelectorCard(form),
+            const SizedBox(height: 12),
+          ],
           _buildLocationsCard(form),
+          if (form.mode == ScheduleMode.freePoint &&
+              form.suggestedRoute != null) ...[
+            const SizedBox(height: 8),
+            RouteUpsellBanner(route: form.suggestedRoute!),
+          ],
           const SizedBox(height: 12),
           _buildDateTimeCard(form),
           const SizedBox(height: 12),
@@ -384,6 +407,92 @@ class _ScheduleRideScreenState extends ConsumerState<ScheduleRideScreen> {
   }
 
   // ── Sections ──────────────────────────────────────────────────────
+
+  Widget _buildRouteSelectorCard(ScheduleRideFormState form) {
+    final route = form.selectedRoute;
+    return InkWell(
+      onTap: () async {
+        final picked = await RoutePickerSheet.show(context);
+        if (picked != null && mounted) {
+          ref
+              .read(scheduleRideFormProvider.notifier)
+              .setSelectedRoute(picked);
+        }
+      },
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: AppColors.white,
+          borderRadius: AppRadius.card,
+          boxShadow: AppShadows.xs,
+          border: Border.all(
+            color: route != null
+                ? AppColors.primary300
+                : AppColors.ink200,
+            width: route != null ? 1.5 : 1,
+          ),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 44,
+              height: 44,
+              decoration: BoxDecoration(
+                color: AppColors.primary100,
+                borderRadius: BorderRadius.circular(14),
+              ),
+              child: const Icon(
+                PhosphorIconsFill.path,
+                color: AppColors.primary500,
+                size: 22,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    'Tuyến đường',
+                    style: AppTypography.caption.copyWith(
+                      color: AppColors.ink500,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    route?.name ?? 'Chọn tuyến đường',
+                    style: AppTypography.bodyLarge.copyWith(
+                      fontWeight: FontWeight.w700,
+                      color: route != null
+                          ? AppColors.ink900
+                          : AppColors.ink400,
+                    ),
+                  ),
+                  if (route != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      '${route.distanceLabel} · ${route.fareLabel}',
+                      style: AppTypography.caption.copyWith(
+                        color: AppColors.ink600,
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            const Icon(
+              PhosphorIconsRegular.caretRight,
+              size: 16,
+              color: AppColors.ink400,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   Widget _buildLocationsCard(ScheduleRideFormState form) {
     return _CardShell(

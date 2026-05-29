@@ -9,18 +9,22 @@ import '../../core/utils/format.dart';
 import '../../core/widgets/wg_badge.dart';
 import '../../core/widgets/wg_button.dart';
 import '../../core/widgets/wg_toast.dart';
-import '../../models/transaction.dart';
+import '../../models/wallet.dart';
+import '../../models/wallet_transaction.dart';
 import '../../providers/wallet_provider.dart';
 import '_widgets/transaction_item.dart';
 
+/// Driver wallet screen — Phase 5Q rebuild. Reads the Mongo-backed
+/// [Wallet] + [WalletTransaction] feeds instead of the legacy mock.
+/// Bank-account section is intentionally still hard-coded — wiring up
+/// bank settlement is out of Phase 5Q scope.
 class DriverWalletScreen extends ConsumerWidget {
   const DriverWalletScreen({super.key});
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final wallet = ref.watch(walletStateProvider);
-    final state = ref.read(walletStateProvider.notifier);
-    final groups = _groupByDate(wallet);
+    final walletAsync = ref.watch(currentUserWalletProvider);
+    final historyAsync = ref.watch(walletHistoryProvider);
 
     return Scaffold(
       backgroundColor: AppColors.offWhite,
@@ -31,98 +35,129 @@ class DriverWalletScreen extends ConsumerWidget {
         ),
         title: const Text('Ví của tôi'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          _BalanceCard(
-            balance: state.currentBalance,
-            withdrawnThisMonth: state.withdrawnThisMonth,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            'Tài khoản liên kết',
-            style: AppTypography.bodyLarge.copyWith(
-              color: AppColors.ink900,
-              fontWeight: FontWeight.w700,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          ref.invalidate(currentUserWalletProvider);
+          ref.invalidate(walletHistoryProvider);
+          await Future.wait([
+            ref.read(currentUserWalletProvider.future),
+            ref.read(walletHistoryProvider.future),
+          ]);
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            walletAsync.when(
+              loading: () => const _BalanceCardSkeleton(),
+              error: (e, _) => _BalanceCardError(message: '$e'),
+              data: (w) => _BalanceCard(
+                wallet: w,
+                onTopup: () => _showTopupSheet(context, ref),
+              ),
             ),
-          ),
-          const SizedBox(height: 10),
-          _AccountCard(
-            brand: 'M',
-            brandColor: const Color(0xFFA50064),
-            name: 'MoMo',
-            holder: 'Nguyễn Thị D · ****8821',
-            isDefault: true,
-          ),
-          const SizedBox(height: 10),
-          _AccountCard(
-            brand: 'V',
-            brandColor: const Color(0xFF1E8A50),
-            name: 'Vietcombank',
-            holder: 'VCB · ****4419',
-            isDefault: false,
-          ),
-          const SizedBox(height: 10),
-          GestureDetector(
-            onTap: () => WgToast.info(context, 'Thêm tài khoản sắp ra mắt'),
-            child: Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: AppColors.primary50,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: AppColors.primary500.withValues(alpha: 0.3),
-                  width: 1.5,
+            const SizedBox(height: 16),
+            Text(
+              'Tài khoản liên kết',
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.ink900,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 10),
+            const _AccountCard(
+              brand: 'M',
+              brandColor: Color(0xFFA50064),
+              name: 'MoMo',
+              holder: 'Nguyễn Thị D · ****8821',
+              isDefault: true,
+            ),
+            const SizedBox(height: 10),
+            const _AccountCard(
+              brand: 'V',
+              brandColor: Color(0xFF1E8A50),
+              name: 'Vietcombank',
+              holder: 'VCB · ****4419',
+              isDefault: false,
+            ),
+            const SizedBox(height: 10),
+            GestureDetector(
+              onTap: () => WgToast.info(context, 'Thêm tài khoản sắp ra mắt'),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: AppColors.primary50,
+                  borderRadius: BorderRadius.circular(16),
+                  border: Border.all(
+                    color: AppColors.primary500.withValues(alpha: 0.3),
+                    width: 1.5,
+                  ),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(
+                      PhosphorIconsRegular.plusCircle,
+                      color: AppColors.primary500,
+                      size: 22,
+                    ),
+                    const SizedBox(width: 10),
+                    Text(
+                      'Thêm tài khoản',
+                      style: AppTypography.body.copyWith(
+                        color: AppColors.primary700,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Row(
-                children: [
-                  const Icon(
-                    PhosphorIconsRegular.plusCircle,
-                    color: AppColors.primary500,
-                    size: 22,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    'Thêm tài khoản',
-                    style: AppTypography.body.copyWith(
-                      color: AppColors.primary700,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ],
+            ),
+            const SizedBox(height: 24),
+            Text(
+              'Lịch sử giao dịch',
+              style: AppTypography.bodyLarge.copyWith(
+                color: AppColors.ink900,
+                fontWeight: FontWeight.w700,
               ),
             ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            'Lịch sử giao dịch',
-            style: AppTypography.bodyLarge.copyWith(
-              color: AppColors.ink900,
-              fontWeight: FontWeight.w700,
+            const SizedBox(height: 12),
+            historyAsync.when(
+              loading: () => const Padding(
+                padding: EdgeInsets.all(24),
+                child: Center(child: CircularProgressIndicator()),
+              ),
+              error: (e, _) => Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  'Không tải được lịch sử: $e',
+                  style: AppTypography.caption.copyWith(color: AppColors.danger),
+                ),
+              ),
+              data: (txns) {
+                if (txns.isEmpty) return const _EmptyHistory();
+                final groups = _groupByDate(txns);
+                return Column(
+                  children: groups.entries
+                      .map((e) => _DateGroup(label: e.key, items: e.value))
+                      .toList(growable: false),
+                );
+              },
             ),
-          ),
-          const SizedBox(height: 12),
-          ...groups.entries.map(
-            (e) => _DateGroup(label: e.key, items: e.value),
-          ),
-          const SizedBox(height: 24),
-        ],
+            const SizedBox(height: 24),
+          ],
+        ),
       ),
     );
   }
 
-  Map<String, List<WalletTxn>> _groupByDate(List<WalletTxn> items) {
+  Map<String, List<WalletTransaction>> _groupByDate(
+    List<WalletTransaction> items,
+  ) {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     final yesterday = today.subtract(const Duration(days: 1));
-    final out = <String, List<WalletTxn>>{};
+    final out = <String, List<WalletTransaction>>{};
     for (final t in items) {
-      final d = DateTime(
-        t.occurredAt.year,
-        t.occurredAt.month,
-        t.occurredAt.day,
-      );
+      final d = DateTime(t.createdAt.year, t.createdAt.month, t.createdAt.day);
       String key;
       if (d == today) {
         key = 'Hôm nay';
@@ -130,21 +165,53 @@ class DriverWalletScreen extends ConsumerWidget {
         key = 'Hôm qua';
       } else {
         key =
-            '${d.day.toString().padLeft(2, '0')}/${d.month.toString().padLeft(2, '0')}/${d.year}';
+            '${d.day.toString().padLeft(2, '0')}/'
+            '${d.month.toString().padLeft(2, '0')}/'
+            '${d.year}';
       }
       out.putIfAbsent(key, () => []).add(t);
     }
     return out;
   }
+
+  Future<void> _showTopupSheet(BuildContext context, WidgetRef ref) async {
+    final wallet = ref.read(currentUserWalletProvider).valueOrNull;
+    if (wallet == null) return;
+    final picked = await showModalBottomSheet<int>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: AppColors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      builder: (_) => const _TopupSheet(),
+    );
+    if (picked == null || !context.mounted) return;
+
+    final svc = ref.read(walletServiceProvider);
+    final result = await svc.topup(userId: wallet.userId, amount: picked);
+    if (!context.mounted) return;
+    if (!result.isSuccess) {
+      WgToast.error(context, result.error ?? 'Nạp ví thất bại');
+      return;
+    }
+    WgToast.success(context, 'Đã nạp ${formatVnd(picked)}');
+    ref.invalidate(currentUserWalletProvider);
+    ref.invalidate(walletHistoryProvider);
+  }
 }
 
 class _BalanceCard extends StatelessWidget {
-  const _BalanceCard({required this.balance, required this.withdrawnThisMonth});
-  final int balance;
-  final int withdrawnThisMonth;
+  const _BalanceCard({required this.wallet, required this.onTopup});
+  final Wallet? wallet;
+  final VoidCallback onTopup;
 
   @override
   Widget build(BuildContext context) {
+    final balance = wallet?.balance ?? 0;
+    final minRequired = wallet?.minBalanceRequired ?? 0;
+    final canAccept = wallet?.canAcceptTrips ?? false;
+
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
@@ -185,29 +252,194 @@ class _BalanceCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Text(
-            'Đã rút trong tháng: ${formatVnd(withdrawnThisMonth)}',
-            style: AppTypography.caption.copyWith(color: AppColors.ink500),
-          ),
+          if (minRequired > 0)
+            Row(
+              children: [
+                Icon(
+                  canAccept
+                      ? PhosphorIconsFill.checkCircle
+                      : PhosphorIconsFill.warning,
+                  size: 14,
+                  color: canAccept ? AppColors.success : AppColors.warning,
+                ),
+                const SizedBox(width: 4),
+                Expanded(
+                  child: Text(
+                    canAccept
+                        ? 'Đủ điều kiện nhận chuyến'
+                        : 'Cần ≥ ${formatVnd(minRequired)} để nhận chuyến',
+                    style: AppTypography.caption.copyWith(
+                      color: canAccept
+                          ? AppColors.success
+                          : AppColors.warning,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ],
+            ),
           const SizedBox(height: 20),
           Row(
             children: [
               Expanded(
                 child: WgButton.primary(
-                  label: 'Rút tiền',
-                  leadingIcon: PhosphorIconsRegular.paperPlaneRight,
-                  onPressed: () => WgToast.info(context, 'Rút tiền sắp ra mắt'),
+                  label: 'Nạp',
+                  leadingIcon: PhosphorIconsRegular.plus,
+                  onPressed: wallet == null ? null : onTopup,
                 ),
               ),
               const SizedBox(width: 12),
               Expanded(
                 child: WgButton.secondary(
-                  label: 'Nạp',
-                  leadingIcon: PhosphorIconsRegular.plus,
-                  onPressed: () => WgToast.info(context, 'Nạp tiền sắp ra mắt'),
+                  label: 'Rút tiền',
+                  leadingIcon: PhosphorIconsRegular.paperPlaneRight,
+                  onPressed: () => WgToast.info(context, 'Rút tiền sắp ra mắt'),
                 ),
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _BalanceCardSkeleton extends StatelessWidget {
+  const _BalanceCardSkeleton();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: const SizedBox(
+        height: 120,
+        child: Center(child: CircularProgressIndicator()),
+      ),
+    );
+  }
+}
+
+class _BalanceCardError extends StatelessWidget {
+  const _BalanceCardError({required this.message});
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.danger.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(28),
+      ),
+      child: Text(
+        'Không tải được ví: $message',
+        style: AppTypography.body.copyWith(color: AppColors.danger),
+      ),
+    );
+  }
+}
+
+class _EmptyHistory extends StatelessWidget {
+  const _EmptyHistory();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.all(28),
+      decoration: BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          const Icon(
+            PhosphorIconsRegular.receipt,
+            color: AppColors.ink300,
+            size: 44,
+          ),
+          const SizedBox(height: 10),
+          Text(
+            'Chưa có giao dịch nào',
+            style: AppTypography.body.copyWith(color: AppColors.ink500),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TopupSheet extends StatelessWidget {
+  const _TopupSheet();
+
+  static const _options = [50000, 100000, 200000, 500000, 1000000];
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: AppColors.ink300,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 14),
+          Text(
+            'Chọn mệnh giá nạp',
+            style: AppTypography.h2.copyWith(fontWeight: FontWeight.w800),
+          ),
+          const SizedBox(height: 18),
+          ..._options.map(
+            (v) => Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: InkWell(
+                onTap: () => Navigator.pop(context, v),
+                borderRadius: BorderRadius.circular(14),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: AppColors.ink50,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.ink200),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(
+                        PhosphorIconsFill.wallet,
+                        color: AppColors.primary500,
+                        size: 22,
+                      ),
+                      const SizedBox(width: 12),
+                      Text(
+                        formatVnd(v),
+                        style: AppTypography.bodyLarge.copyWith(
+                          fontWeight: FontWeight.w800,
+                          fontFamily: 'monospace',
+                        ),
+                      ),
+                      const Spacer(),
+                      const Icon(
+                        PhosphorIconsRegular.caretRight,
+                        size: 16,
+                        color: AppColors.ink400,
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ),
         ],
       ),
@@ -305,7 +537,7 @@ class _AccountCard extends StatelessWidget {
 class _DateGroup extends StatelessWidget {
   const _DateGroup({required this.label, required this.items});
   final String label;
-  final List<WalletTxn> items;
+  final List<WalletTransaction> items;
 
   @override
   Widget build(BuildContext context) {

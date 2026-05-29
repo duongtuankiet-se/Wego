@@ -9,4 +9,7 @@ class Collections {
   static const String scheduledTrips = 'scheduled_trips';
   static const String driverVehicles = 'driver_vehicles';
   static const String tripPools = 'trip_pools';
+  static const String routes = 'routes';
+  static const String wallets = 'wallets';
+  static const String walletTransactions = 'wallet_transactions';
 }
