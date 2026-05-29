@@ -884,16 +884,20 @@ class _ScheduledTripsList extends ConsumerWidget {
       return;
     }
     final svc = ref.read(scheduledTripServiceProvider);
-    final ok = await svc.acceptScheduledTrip(
+    final result = await svc.acceptScheduledTrip(
       tripId: trip.id,
       driverId: driverId!,
     );
     if (!context.mounted) return;
-    if (ok) {
+    // Hotfix: surface the specific reason now that acceptScheduledTrip
+    // returns a record. The old blanket "tài xế khác đã nhận" toast
+    // misfired any time a search-loop offer was in flight for the same
+    // trip, even though no driver had actually accepted yet.
+    if (result.success) {
       ref.invalidate(driverUpcomingTripsProvider);
       WgToast.success(context, 'Đã nhận chuyến ${trip.tripCode}');
     } else {
-      WgToast.error(context, 'Chuyến đã bị tài xế khác nhận');
+      WgToast.error(context, result.reason ?? 'Không thể nhận chuyến này');
       ref.invalidate(driverUpcomingTripsProvider);
     }
   }

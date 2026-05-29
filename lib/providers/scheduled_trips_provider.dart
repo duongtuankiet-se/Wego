@@ -54,8 +54,16 @@ Stream<ScheduledTrip?> scheduledTripWatcher(Ref ref, String tripId) async* {
 }
 
 @riverpod
-Future<List<ScheduledTrip>> driverUpcomingTrips(Ref ref) =>
-    ref.watch(scheduledTripServiceProvider).getUpcomingTripsForDriver();
+Future<List<ScheduledTrip>> driverUpcomingTrips(Ref ref) async {
+  // Hotfix: pass driverId so the upcoming list also surfaces trips
+  // briefly flipped to `offered` for THIS driver — without it, every
+  // search-loop offer made the trip vanish from the list while the
+  // popup was deciding.
+  final user = await ref.watch(authStateProvider.future);
+  return ref
+      .watch(scheduledTripServiceProvider)
+      .getUpcomingTripsForDriver(driverId: user?.id);
+}
 
 // ─────────────────────────────────────────────────────────────────────
 // Form state for Schedule Ride Screen
