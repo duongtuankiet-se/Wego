@@ -311,7 +311,18 @@ class ScheduledTripService {
           })
           .sortBy('scheduled_at'),
     );
-    return [await for (final doc in cursor) ScheduledTrip.fromMongo(doc)];
+    final list = [
+      await for (final doc in cursor) ScheduledTrip.fromMongo(doc),
+    ];
+    // Hotfix v4: explicit log so user-isolation regressions show up
+    // in `flutter logs` immediately. If you see two different user
+    // ids in successive log lines but the same trip list, that's a
+    // cache leak, not a query bug.
+    developer.log(
+      '[sched] getUpcomingTrips passenger=$passengerId → ${list.length} trips',
+      name: 'sched',
+    );
+    return list;
   }
 
   Future<List<ScheduledTrip>> getPastTrips(
@@ -330,7 +341,14 @@ class ScheduledTripService {
           .sortBy('scheduled_at', descending: true)
           .limit(limit),
     );
-    return [await for (final doc in cursor) ScheduledTrip.fromMongo(doc)];
+    final list = [
+      await for (final doc in cursor) ScheduledTrip.fromMongo(doc),
+    ];
+    developer.log(
+      '[sched] getPastTrips passenger=$passengerId → ${list.length} trips',
+      name: 'sched',
+    );
+    return list;
   }
 
   Future<ScheduledTrip?> getById(String tripId) async {
