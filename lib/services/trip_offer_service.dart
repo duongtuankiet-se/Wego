@@ -388,12 +388,21 @@ class TripOfferService {
       // only fires when the trip is still genuinely unassigned. This
       // is why the customer was seeing "Không tìm được tài xế" on
       // trips a driver had actually picked up.
+      // Hotfix: the previous patch already added the status guard,
+      // but a trip that joined a pool BETWEEN this loop's find() and
+      // updateOne() would still get flipped — find saw pool_id null,
+      // pool engine then set it, updateOne missed the new pool_id and
+      // overwrote a now-pooled trip's status. Adding pool_id: null
+      // to the update guard closes that window. This is exactly what
+      // produced the contradictory "Không tìm được tài xế" banner
+      // sitting on top of a green "Đang gom khách" pool card.
       await tripsCol.updateOne(
         where.raw(<String, dynamic>{
           '_id': tripObjId,
           'status': {
             r'$in': ['pending', 'offered'],
           },
+          'pool_id': null,
         }),
         modify
             .set('status', ScheduledTripStatus.noDriverFound.mongoName)
