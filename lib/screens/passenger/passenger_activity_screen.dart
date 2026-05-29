@@ -188,6 +188,11 @@ class _ScheduledTripCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
+                // Hotfix: top row used to overflow ~30px when statusLabel
+                // was long ("Tài xế đã nhận") + tripCode was visible.
+                // Wrap intrinsic-width children in Flexible so the
+                // status badge + tripCode shrink/ellipsis instead of
+                // running off the card edge.
                 Row(
                   children: [
                     WgBadge(
@@ -199,13 +204,20 @@ class _ScheduledTripCard extends StatelessWidget {
                           : WgBadgeVariant.info,
                     ),
                     const SizedBox(width: 8),
-                    WgStatusBadge(label: trip.statusLabel, tone: _tone),
-                    const Spacer(),
-                    Text(
-                      trip.tripCode,
-                      style: AppTypography.micro.copyWith(
-                        color: AppColors.ink500,
-                        fontFamily: 'monospace',
+                    Flexible(
+                      child: WgStatusBadge(label: trip.statusLabel, tone: _tone),
+                    ),
+                    const SizedBox(width: 8),
+                    Flexible(
+                      child: Text(
+                        trip.tripCode,
+                        textAlign: TextAlign.right,
+                        style: AppTypography.micro.copyWith(
+                          color: AppColors.ink500,
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -480,6 +492,9 @@ class _InstantTripCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Hotfix: when both the type badge AND the "ĐÃ HUỶ" badge
+          // were rendered the row could overflow ~30px. Allow the
+          // cancelled-badge to flex first since it's the secondary one.
           Row(
             children: [
               WgBadge(
@@ -490,7 +505,12 @@ class _InstantTripCard extends StatelessWidget {
               ),
               const SizedBox(width: 8),
               if (isCancelled)
-                const WgBadge(label: 'ĐÃ HUỶ', variant: WgBadgeVariant.surge),
+                const Flexible(
+                  child: WgBadge(
+                    label: 'ĐÃ HUỶ',
+                    variant: WgBadgeVariant.surge,
+                  ),
+                ),
               const Spacer(),
               Text(
                 _hhmm(trip.createdAt),
@@ -621,17 +641,20 @@ class _PastScheduledCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Hotfix: status labels like "Không tìm được tài xế" pushed
+            // the row 50px past the card edge even after the previous
+            // pass wrapped status + date in Flexible — the leading
+            // "ĐẶT TRƯỚC" badge was still intrinsic-width. Wrapping it
+            // too lets the three children share the available width.
             Row(
               children: [
-                const WgBadge(
-                  label: 'ĐẶT TRƯỚC',
-                  variant: WgBadgeVariant.shared,
+                const Flexible(
+                  child: WgBadge(
+                    label: 'ĐẶT TRƯỚC',
+                    variant: WgBadgeVariant.shared,
+                  ),
                 ),
                 const SizedBox(width: 8),
-                // Hotfix: long status labels ("Tài xế đã nhận") + long
-                // dates ("Thứ Hai, 28/05 • 08:00") used to push past the
-                // card edge. Flexible lets each shrink, the date scales
-                // before truncating so the time stays readable.
                 Flexible(
                   child: WgStatusBadge(label: trip.statusLabel, tone: _tone),
                 ),

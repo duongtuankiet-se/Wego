@@ -6,7 +6,9 @@ import '../core/utils/format.dart';
 import '../data/mock_drivers.dart';
 import '../models/user.dart';
 import '../services/auth_service.dart';
+import 'current_trip_provider.dart';
 import 'driver_provider.dart';
+import 'incoming_trip_provider.dart';
 import 'mongo_provider.dart';
 import 'notifications_provider.dart';
 
@@ -274,10 +276,13 @@ class AuthState extends _$AuthState {
     // Hotfix: belt-and-braces invalidate. Most user-scoped providers
     // already react to authStateProvider's null state because they
     // ref.watch(authStateProvider.future), but a few keepAlive caches
-    // (notifications mock, current driver doc) can hold a previous
-    // user's data across a logout → login switch. Invalidating here
-    // forces a clean rebuild on next read.
+    // (notifications mock, current driver doc, in-progress trip, last
+    // dispatched offer) can hold a previous user's data across a
+    // logout → login switch. Clear them all on the way out so the
+    // next user's first read is guaranteed clean.
     ref.invalidate(currentDriverProvider);
     ref.read(notificationsProvider.notifier).reset();
+    ref.read(currentTripProvider.notifier).clear();
+    ref.read(activeOfferProvider.notifier).clear();
   }
 }

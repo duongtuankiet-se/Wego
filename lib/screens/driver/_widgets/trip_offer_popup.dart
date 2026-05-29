@@ -133,7 +133,13 @@ class _TripOfferPopupState extends ConsumerState<TripOfferPopup> {
         );
     if (!mounted) return;
     if (result.success) {
+      // Hotfix: was a fire-and-forget invalidate that let the popup
+      // close before the list refreshed. Invalidate + await the
+      // re-fetched future so the driver home shows the post-accept
+      // state immediately.
       ref.invalidate(driverUpcomingTripsProvider);
+      await ref.read(driverUpcomingTripsProvider.future);
+      if (!mounted) return;
       WgToast.success(context, 'Đã nhận chuyến ${widget.trip.tripCode}');
       Navigator.of(context).pop(true);
     } else {
