@@ -51,14 +51,34 @@ class TripPoolService {
     final scheduledAtUtc = trip.scheduledAt.toUtc();
     const window = Duration(minutes: 30);
 
+    // Hotfix: was matching on dropoff city + district only, which
+    // happily pooled a Đà Nẵng → Hội An booker with a Tam Kỳ → Hội An
+    // booker — there's no single car that can serve both pickups
+    // (~70 km apart). Pin the pickup city too so a pool only gathers
+    // passengers from the same origin corridor (Đà Nẵng pool, Tam Kỳ
+    // pool, Huế pool…). District-level pickup is intentionally NOT
+    // checked — same city, different wards still cluster cleanly.
+    //
+    // Also pin route_id so the two booking modes don't mix: fixedRoute
+    // bookings only pool with other bookers on the same preset route,
+    // and freePoint bookings (route_id null) only pool with other
+    // freePoint bookers in the same city — even if the cities happen
+    // to align with a preset corridor.
+    final routeObjId =
+        trip.routeId == null ? null : ObjectId.fromHexString(trip.routeId!);
     final candidates = await col
         .find(
-          where
-              .eq('status', TripPoolStatus.collecting.mongoName)
-              .eq('dropoff_city', dropoffParts.city)
-              .eq('dropoff_district', dropoffParts.district)
-              .gte('scheduled_at', scheduledAtUtc.subtract(window))
-              .lte('scheduled_at', scheduledAtUtc.add(window)),
+          where.raw(<String, dynamic>{
+            'status': TripPoolStatus.collecting.mongoName,
+            'pickup_city': pickupParts.city,
+            'dropoff_city': dropoffParts.city,
+            'dropoff_district': dropoffParts.district,
+            'route_id': routeObjId,
+            'scheduled_at': {
+              r'$gte': scheduledAtUtc.subtract(window),
+              r'$lte': scheduledAtUtc.add(window),
+            },
+          }),
         )
         .toList();
 
@@ -137,6 +157,13 @@ class TripPoolService {
     final doc = <String, dynamic>{
       '_id': poolId,
       'pool_code': poolCode,
+      // Hotfix: persist route_id so [findOrCreatePool] can keep
+      // fixedRoute pools and freePoint pools separate. freePoint
+      // bookings get route_id null; fixedRoute bookings get the
+      // preset route's ObjectId.
+      'route_id': trip.routeId == null
+          ? null
+          : ObjectId.fromHexString(trip.routeId!),
       'pickup_city': pickupParts.city,
       'pickup_district': pickupParts.district,
       'dropoff_city': dropoffParts.city,

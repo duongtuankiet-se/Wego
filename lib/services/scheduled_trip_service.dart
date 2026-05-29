@@ -157,11 +157,13 @@ class ScheduledTripService {
 
     var trip = ScheduledTrip.fromMongo(doc);
 
-    // Phase 5Q: pool engine is gated to fixed-route bookings only —
-    // matching solo passengers across arbitrary points is too noisy
-    // to be useful. Free-point trips always go out as solo bookings.
-    final canPool =
-        allowPooling && mode == ScheduleMode.fixedRoute && route != null;
+    // Hotfix: anh's updated rule — freePoint bookings should ALSO
+    // pool, but only with other freePoint bookers in the same
+    // city + district. fixedRoute bookings still pool with other
+    // fixedRoute bookers on the same route. The two are kept apart
+    // by the route_id filter inside findOrCreatePool, so removing
+    // the mode-gate here is safe.
+    final canPool = allowPooling;
     if (canPool) {
       try {
         final pool = await TripPoolService(_mongo).findOrCreatePool(trip);
