@@ -9,6 +9,16 @@ enum RecurrenceType { once, daily, weekly }
 
 enum SchedulePaymentMethod { cash, vnpay, momo }
 
+/// Phase 5Q: which booking surface produced this trip.
+///   * `freePoint` — user typed/picked their own pickup + dropoff and
+///     the fare came from the Directions API per-km logic. Pool engine
+///     is bypassed (matching solo passengers across arbitrary points
+///     is too unreliable).
+///   * `fixedRoute` — user chose one of the preset corridors, fare is
+///     flat per the [RoutePreset] price table. This is the mode the
+///     carpool pool engine runs on.
+enum ScheduleMode { freePoint, fixedRoute }
+
 enum ScheduledTripStatus {
   pending,
   matched,
@@ -86,6 +96,8 @@ class ScheduledTrip with _$ScheduledTrip {
     @Default(ScheduledTripStatus.pending) ScheduledTripStatus status,
     String? driverId,
     String? poolId,
+    String? routeId,
+    @Default(ScheduleMode.freePoint) ScheduleMode mode,
     DateTime? cancelledAt,
     String? cancelledBy,
     String? cancelReason,
@@ -170,6 +182,10 @@ class ScheduledTrip with _$ScheduledTrip {
     status: ScheduledTripStatusMongo.fromMongo(doc['status'] as String?),
     driverId: (doc['driver_id'] as ObjectId?)?.oid,
     poolId: (doc['pool_id'] as ObjectId?)?.oid,
+    routeId: (doc['route_id'] as ObjectId?)?.oid,
+    mode: (doc['mode'] as String?) == 'fixed_route'
+        ? ScheduleMode.fixedRoute
+        : ScheduleMode.freePoint,
     cancelledAt: (doc['cancelled_at'] as DateTime?)?.toLocal(),
     cancelledBy: doc['cancelled_by'] as String?,
     cancelReason: doc['cancel_reason'] as String?,

@@ -1,28 +1,34 @@
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:riverpod_annotation/riverpod_annotation.dart';
 
-import '../data/mock_transactions.dart';
-import '../models/transaction.dart';
+import '../models/wallet.dart';
+import '../models/wallet_transaction.dart';
+import '../services/wallet_service.dart';
+import 'auth_provider.dart';
+import 'mongo_provider.dart';
 
 part 'wallet_provider.g.dart';
 
-/// Phase 2: wallet is fully mocked. Real implementation would back this
-/// with a Mongo wallet ledger keyed by driver_id.
 @Riverpod(keepAlive: true)
-class WalletState extends _$WalletState {
-  @override
-  List<WalletTxn> build() => generateMockTransactions();
+WalletService walletService(Ref ref) =>
+    WalletService(ref.watch(mongoServiceProvider));
 
-  int get currentBalance =>
-      state.isNotEmpty ? state.first.balanceAfter ?? 1847500 : 1847500;
+/// Phase 5Q: current user's wallet doc from Mongo. Auto-creates the
+/// wallet on first read so screens never have to worry about a
+/// missing wallet (e.g. session restore for accounts that pre-dated
+/// the wallet system).
+@riverpod
+Future<Wallet?> currentUserWallet(Ref ref) async {
+  final user = await ref.watch(authStateProvider.future);
+  if (user == null) return null;
+  final svc = ref.watch(walletServiceProvider);
+  return svc.getOrCreate(userId: user.id, userRole: user.role.name);
+}
 
-  int get withdrawnThisMonth {
-    final now = DateTime.now();
-    final monthStart = DateTime(now.year, now.month, 1);
-    return state
-        .where(
-          (t) =>
-              t.kind == TxnKind.withdrawal && t.occurredAt.isAfter(monthStart),
-        )
-        .fold<int>(0, (sum, t) => sum + t.amount.abs());
-  }
+@riverpod
+Future<List<WalletTransaction>> walletHistory(Ref ref) async {
+  final user = await ref.watch(authStateProvider.future);
+  if (user == null) return const [];
+  final svc = ref.watch(walletServiceProvider);
+  return svc.getHistory(userId: user.id);
 }

@@ -111,6 +111,11 @@ class _DriverHomeScreenState extends ConsumerState<DriverHomeScreen> {
       if (isOnline) {
         ref.invalidate(incomingTripPollProvider);
       }
+    } on WalletGateException catch (e) {
+      // Phase 5Q wallet gate: route the user to the wallet screen so
+      // they can top up. Specific Vietnamese copy via [e.message].
+      if (!mounted) return;
+      WgToast.error(context, e.message);
     } catch (e) {
       if (mounted) WgToast.error(context, 'Lỗi cập nhật trạng thái: $e');
     }

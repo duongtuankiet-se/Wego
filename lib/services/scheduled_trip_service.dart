@@ -4,6 +4,7 @@ import 'package:mongo_dart/mongo_dart.dart' show ObjectId, where, modify;
 
 import '../core/db/mongo_service.dart';
 import '../data/mock_promos.dart';
+import '../models/route.dart';
 import '../models/scheduled_trip.dart';
 import 'trip_pool_service.dart';
 
@@ -75,14 +76,26 @@ class ScheduledTripService {
     String? promoCode,
     required double estimatedDistanceKm,
     required int estimatedDurationMin,
+    // Phase 5Q dual-mode params:
+    ScheduleMode mode = ScheduleMode.freePoint,
+    RoutePreset? route,
   }) async {
     final col = await _mongo.scheduledTrips();
     final tripCode = await generateTripCode(scheduledAt);
 
-    final baseFare = calcBaseFare(
-      distanceKm: estimatedDistanceKm,
-      rideType: rideType,
-    );
+    // Phase 5Q: flat fare for fixed-route bookings, per-km for free
+    // point. Group discount (≥3 pax) + promo applied on top of either.
+    final int baseFare;
+    if (mode == ScheduleMode.fixedRoute && route != null) {
+      baseFare = rideType == 'shared'
+          ? route.baseFareCarpool * passengerCount
+          : route.baseFarePrivate;
+    } else {
+      baseFare = calcBaseFare(
+        distanceKm: estimatedDistanceKm,
+        rideType: rideType,
+      );
+    }
     final discount = _calcDiscount(
       baseFare: baseFare,
       passengerCount: passengerCount,
@@ -118,6 +131,8 @@ class ScheduledTripService {
       'estimated_fare': estimatedFare,
       'status': ScheduledTripStatus.pending.mongoName,
       'driver_id': null,
+      'mode': mode == ScheduleMode.fixedRoute ? 'fixed_route' : 'free_point',
+      'route_id': route == null ? null : ObjectId.fromHexString(route.id),
       'cancelled_at': null,
       'cancelled_by': null,
       'cancel_reason': null,
@@ -126,15 +141,16 @@ class ScheduledTripService {
     };
 
     await col.insertOne(doc);
-    developer.log('[sched] created $tripCode', name: 'sched');
+    developer.log('[sched] created $tripCode (mode=${mode.name})', name: 'sched');
 
     var trip = ScheduledTrip.fromMongo(doc);
 
-    // Phase 5N: auto-pool if the customer opted into shared rides.
-    // Failures here are swallowed — the trip is already persisted, and
-    // we'd rather show the user a Single-rider confirmation than fail
-    // their booking because the pool engine hiccupped.
-    if (allowPooling) {
+    // Phase 5Q: pool engine is gated to fixed-route bookings only —
+    // matching solo passengers across arbitrary points is too noisy
+    // to be useful. Free-point trips always go out as solo bookings.
+    final canPool =
+        allowPooling && mode == ScheduleMode.fixedRoute && route != null;
+    if (canPool) {
       try {
         final pool = await TripPoolService(_mongo).findOrCreatePool(trip);
         developer.log('[sched] pool ${pool.poolCode}', name: 'sched');

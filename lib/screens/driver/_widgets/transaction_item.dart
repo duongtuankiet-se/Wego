@@ -1,39 +1,21 @@
 import 'package:flutter/material.dart';
-import 'package:phosphor_flutter/phosphor_flutter.dart';
 
 import '../../../core/theme/app_colors.dart';
 import '../../../core/theme/app_typography.dart';
 import '../../../core/utils/format.dart';
-import '../../../models/transaction.dart';
+import '../../../models/wallet_transaction.dart';
 
+/// One row in the driver wallet history. Phase 5Q migration: now binds
+/// against the Mongo-backed [WalletTransaction] (was the legacy
+/// `WalletTxn` mock model). Icon + color come from the
+/// [WalletTxnTypeX] extension so the row chrome stays in sync with
+/// any new transaction kinds added to the enum.
 class TransactionItem extends StatelessWidget {
   const TransactionItem({super.key, required this.txn});
-  final WalletTxn txn;
-
-  ({IconData icon, Color color, Color bg}) get _visual {
-    if (txn.amount > 0) {
-      if (txn.kind == TxnKind.bonus) {
-        return (
-          icon: PhosphorIconsFill.gift,
-          color: const Color(0xFFD4A574),
-          bg: const Color(0xFFFFF8EC),
-        );
-      }
-      return (
-        icon: PhosphorIconsRegular.arrowDown,
-        color: AppColors.success,
-        bg: AppColors.success.withValues(alpha: 0.15),
-      );
-    }
-    return (
-      icon: PhosphorIconsRegular.arrowUp,
-      color: AppColors.danger,
-      bg: AppColors.danger.withValues(alpha: 0.15),
-    );
-  }
+  final WalletTransaction txn;
 
   String _time() {
-    final dt = txn.occurredAt;
+    final dt = txn.createdAt;
     final hh = dt.hour.toString().padLeft(2, '0');
     final mm = dt.minute.toString().padLeft(2, '0');
     return '$hh:$mm';
@@ -41,9 +23,8 @@ class TransactionItem extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final v = _visual;
-    final sign = txn.amount >= 0 ? '+' : '-';
-    final amount = '$sign${formatVnd(txn.amount.abs())}';
+    final color = txn.type.color;
+    final amount = '${txn.isCredit ? "+" : "-"}${formatVnd(txn.amount.abs())}';
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
       child: Row(
@@ -52,10 +33,10 @@ class TransactionItem extends StatelessWidget {
             width: 36,
             height: 36,
             decoration: BoxDecoration(
-              color: v.bg,
+              color: color.withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(12),
             ),
-            child: Icon(v.icon, color: v.color, size: 18),
+            child: Icon(txn.type.icon, color: color, size: 18),
           ),
           const SizedBox(width: 12),
           Expanded(
@@ -63,7 +44,7 @@ class TransactionItem extends StatelessWidget {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  txn.kind.label,
+                  txn.type.label,
                   style: AppTypography.body.copyWith(
                     color: AppColors.ink900,
                     fontWeight: FontWeight.w600,
@@ -90,17 +71,16 @@ class TransactionItem extends StatelessWidget {
               Text(
                 amount,
                 style: AppTypography.body.copyWith(
-                  color: v.color,
+                  color: color,
                   fontWeight: FontWeight.w700,
                   fontFamily: 'monospace',
                   fontFeatures: const [FontFeature.tabularFigures()],
                 ),
               ),
-              if (txn.balanceAfter != null)
-                Text(
-                  'Số dư ${formatVnd(txn.balanceAfter!)}',
-                  style: AppTypography.micro.copyWith(color: AppColors.ink500),
-                ),
+              Text(
+                'Số dư ${formatVnd(txn.balanceAfter)}',
+                style: AppTypography.micro.copyWith(color: AppColors.ink500),
+              ),
             ],
           ),
         ],

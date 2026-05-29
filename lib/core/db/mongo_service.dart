@@ -103,6 +103,12 @@ class MongoService {
       (await getDb()).collection(Collections.driverVehicles);
   Future<DbCollection> tripPools() async =>
       (await getDb()).collection(Collections.tripPools);
+  Future<DbCollection> routes() async =>
+      (await getDb()).collection(Collections.routes);
+  Future<DbCollection> wallets() async =>
+      (await getDb()).collection(Collections.wallets);
+  Future<DbCollection> walletTransactions() async =>
+      (await getDb()).collection(Collections.walletTransactions);
 
   Future<void> close() async {
     try {
@@ -200,6 +206,39 @@ class MongoService {
         .createIndex(
           keys: {'driver_id': 1, 'status': 1},
           name: 'idx_pools_driver_status',
+        );
+    // ── Phase 5Q routes + wallet ────────────────────────────────
+    await db
+        .collection(Collections.routes)
+        .createIndex(
+          keys: {'route_code': 1},
+          unique: true,
+          name: 'idx_routes_code_unique',
+        );
+    await db
+        .collection(Collections.routes)
+        .createIndex(
+          keys: {'is_active': 1, 'display_order': 1},
+          name: 'idx_routes_active_order',
+        );
+    await db
+        .collection(Collections.routes)
+        .createIndex(
+          keys: {'pickup_city': 1, 'dropoff_city': 1},
+          name: 'idx_routes_endpoints',
+        );
+    await db
+        .collection(Collections.wallets)
+        .createIndex(
+          keys: {'user_id': 1},
+          unique: true,
+          name: 'idx_wallets_user_unique',
+        );
+    await db
+        .collection(Collections.walletTransactions)
+        .createIndex(
+          keys: {'user_id': 1, 'created_at': -1},
+          name: 'idx_wallet_txns_user_time',
         );
   }
 }
