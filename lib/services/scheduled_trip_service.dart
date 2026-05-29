@@ -138,7 +138,13 @@ class ScheduledTripService {
       'offered_to_drivers': <ObjectId>[],
       'rejected_by_drivers': <ObjectId>[],
       'offer_attempts': 0,
-      'search_timeout_at': now.add(const Duration(minutes: 10)),
+      // Hotfix: was hardcoded `now + 10 min`, which immediately
+      // expired trips scheduled hours/days out the moment the
+      // search-job tick caught them — flipping them to noDriverFound
+      // even though the customer's pickup hadn't even started its
+      // search window. Bound to scheduledAt, floored at "now + 30 min"
+      // so short-lead bookings still get a real search window.
+      'search_timeout_at': _searchTimeoutFor(scheduledAt.toUtc(), now),
       'cancelled_at': null,
       'cancelled_by': null,
       'cancel_reason': null,
@@ -276,6 +282,16 @@ class ScheduledTripService {
     );
   }
 
+  /// Hotfix helper: search ends 5 min before the scheduled pickup so
+  /// the customer isn't left in limbo at departure, but never sooner
+  /// than 30 min from now so a "book in 35 min" trip still gets a
+  /// real search runway.
+  static DateTime _searchTimeoutFor(DateTime scheduledAtUtc, DateTime now) {
+    final preferred = scheduledAtUtc.subtract(const Duration(minutes: 5));
+    final floor = now.add(const Duration(minutes: 30));
+    return preferred.isBefore(floor) ? floor : preferred;
+  }
+
   // ─────────────────────────────────────────────────────────────────
   // Queries
   // ─────────────────────────────────────────────────────────────────
@@ -330,18 +346,43 @@ class ScheduledTripService {
   /// accept from a list. Phase 5R: pool trips (`pool_id != null`) are
   /// skipped since the pool flow runs their assignment via
   /// [TripPoolService.driverAcceptPool] on `DriverPoolsScreen`.
+  ///
+  /// Hotfix: also surface trips that the search loop briefly flipped
+  /// to `offered` but whose offer holder has lapsed (or is this same
+  /// driver). Without this, customer-just-booked trips disappear from
+  /// the list the moment the search-job tick fires the first offer.
   Future<List<ScheduledTrip>> getUpcomingTripsForDriver({
+    String? driverId,
     int limitHours = 48,
   }) async {
     final col = await _mongo.scheduledTrips();
     final now = DateTime.now().toUtc();
     final until = now.add(Duration(hours: limitHours));
+    final driverObjId =
+        driverId == null ? null : ObjectId.fromHexString(driverId);
 
     final cursor = col.find(
       where
           .raw(<String, dynamic>{
-            'status': 'pending',
+            r'$or': <Map<String, dynamic>>[
+              {'status': 'pending'},
+              {
+                'status': 'offered',
+                r'$or': <Map<String, dynamic>>[
+                  // Offer lapsed but the search job hasn't swept it
+                  // back to pending yet — treat as available.
+                  {
+                    'current_offer_expires_at': {r'$lte': now},
+                  },
+                  // Offer is for this driver themselves — they can
+                  // pop it via the list as a backup to the popup.
+                  if (driverObjId != null)
+                    {'current_offered_driver_id': driverObjId},
+                ],
+              },
+            ],
             'pool_id': null,
+            'driver_id': null,
             'scheduled_at': {r'$gte': now, r'$lte': until},
           })
           .sortBy('scheduled_at')
@@ -354,21 +395,106 @@ class ScheduledTripService {
   // Mutations
   // ─────────────────────────────────────────────────────────────────
 
-  /// Driver locks in a pending scheduled trip. Returns true on success
-  /// (status was still `pending` when the update ran).
-  Future<bool> acceptScheduledTrip({
+  /// Hotfix: driver-home list accept. Two paths can land here:
+  ///   * trip is still `pending` — straight accept;
+  ///   * trip flipped to `offered` because the search loop made a
+  ///     transient offer, but the holder lapsed OR is this same driver.
+  ///
+  /// The old "status='pending' only" guard meant the moment search-job
+  /// fired its first offer (any driver), the list-accept failed with a
+  /// misleading "tài xế khác đã nhận" toast even though nobody had
+  /// actually accepted. Atomic where-clause now allows either valid
+  /// case; failures get diagnosed with [_diagnoseListAcceptFailure].
+  Future<({bool success, String? reason})> acceptScheduledTrip({
     required String tripId,
     required String driverId,
   }) async {
     final col = await _mongo.scheduledTrips();
+    final now = DateTime.now().toUtc();
+    final tripObjId = ObjectId.fromHexString(tripId);
+    final driverObjId = ObjectId.fromHexString(driverId);
+
     final res = await col.updateOne(
-      where.eq('_id', ObjectId.fromHexString(tripId)).eq('status', 'pending'),
+      where.raw(<String, dynamic>{
+        '_id': tripObjId,
+        'driver_id': null,
+        r'$or': <Map<String, dynamic>>[
+          {'status': 'pending'},
+          {
+            'status': 'offered',
+            r'$or': <Map<String, dynamic>>[
+              {
+                'current_offer_expires_at': {r'$lte': now},
+              },
+              {'current_offered_driver_id': driverObjId},
+            ],
+          },
+        ],
+      }),
       modify
-          .set('driver_id', ObjectId.fromHexString(driverId))
+          .set('driver_id', driverObjId)
           .set('status', ScheduledTripStatus.driverAssigned.mongoName)
-          .set('updated_at', DateTime.now().toUtc()),
+          .set('current_offered_driver_id', null)
+          .set('current_offer_expires_at', null)
+          .set('updated_at', now),
     );
-    return res.isSuccess && (res.nModified) > 0;
+
+    if (res.isSuccess && res.nModified > 0) {
+      // Also clear the driver-side offer marker if this driver had a
+      // pending popup for the same trip — keeps the two collections
+      // consistent after a list-tap shortcut.
+      final driversCol = await _mongo.drivers();
+      await driversCol.updateOne(
+        where.eq('_id', driverObjId),
+        modify
+            .set('current_offer_trip_id', null)
+            .set('current_offer_expires_at', null)
+            .set('updated_at', now),
+      );
+      developer.log('[sched] LIST-ACCEPT $tripId → $driverId', name: 'sched');
+      return (success: true, reason: null);
+    }
+
+    // Atomic update matched nothing — figure out what actually
+    // happened so the driver sees a useful toast.
+    final tripDoc = await col.findOne(where.eq('_id', tripObjId));
+    if (tripDoc == null) {
+      return (success: false, reason: 'Chuyến không còn tồn tại');
+    }
+    final trip = ScheduledTrip.fromMongo(tripDoc);
+    return (
+      success: false,
+      reason: _diagnoseListAcceptFailure(trip: trip, driverId: driverId, now: now),
+    );
+  }
+
+  String _diagnoseListAcceptFailure({
+    required ScheduledTrip trip,
+    required String driverId,
+    required DateTime now,
+  }) {
+    if (trip.driverId == driverId) return 'Chuyến đã thuộc về bạn';
+    if (trip.driverId != null) return 'Chuyến đã được tài xế khác nhận';
+    switch (trip.status) {
+      case ScheduledTripStatus.cancelled:
+        return 'Chuyến đã bị huỷ';
+      case ScheduledTripStatus.completed:
+        return 'Chuyến đã hoàn thành';
+      case ScheduledTripStatus.noDriverFound:
+      case ScheduledTripStatus.expired:
+        return 'Chuyến đã hết hạn tìm tài xế';
+      case ScheduledTripStatus.offered:
+        // Offered to someone else and that offer is still alive — be
+        // explicit so the driver doesn't think someone already
+        // accepted.
+        return 'Chuyến đang được mời cho tài xế khác, vui lòng thử lại sau';
+      case ScheduledTripStatus.driverAssigned:
+      case ScheduledTripStatus.matched:
+      case ScheduledTripStatus.started:
+        return 'Chuyến đã được tài xế khác nhận';
+      case ScheduledTripStatus.pending:
+        return 'Không thể nhận chuyến này, vui lòng thử lại';
+    }
   }
 
   Future<bool> cancelScheduledTrip({
