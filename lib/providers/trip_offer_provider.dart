@@ -23,7 +23,12 @@ TripOfferService tripOfferService(Ref ref) =>
 /// offer in flight, so the listening UI can clear any stale popup state.
 @riverpod
 Stream<CurrentOffer> driverCurrentOffer(Ref ref) async* {
-  final user = ref.watch(authStateProvider).valueOrNull;
+  // Hotfix: was `.valueOrNull` which is a sticky getter on AsyncValue
+  // — it kept returning Account A even after logout flipped the state
+  // through AsyncData(null), so the stream stayed parked on A's driver
+  // id when Account B logged in. Switch to `.future` so the stream
+  // re-runs whenever authStateProvider transitions.
+  final user = await ref.watch(authStateProvider.future);
   if (user == null || user.role != UserRole.driver) {
     yield CurrentOffer.empty;
     return;
@@ -79,6 +84,12 @@ class TripSearchJob extends _$TripSearchJob {
           // the status banner updates without waiting for its own tick.
           ref.invalidate(upcomingScheduledTripsProvider);
         }
+        // Hotfix: driver-side list stale after another driver accepts
+        // — until now Y's "Chuyến sắp tới" kept rendering the trip X
+        // just took. Invalidate every tick (cheap query, no offer
+        // counter to gate on) so Y's list catches up within 10s
+        // without needing a server push.
+        ref.invalidate(driverUpcomingTripsProvider);
       } catch (e, st) {
         developer.log(
           '[search-job] sweep failed: $e',

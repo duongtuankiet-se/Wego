@@ -893,12 +893,18 @@ class _ScheduledTripsList extends ConsumerWidget {
     // returns a record. The old blanket "tài xế khác đã nhận" toast
     // misfired any time a search-loop offer was in flight for the same
     // trip, even though no driver had actually accepted yet.
+    //
+    // Hotfix v2: `ref.invalidate` was fire-and-forget — the list still
+    // rendered the just-accepted trip for the few hundred ms it took
+    // the re-fetch to land. Use `ref.refresh(...).future` so we hold
+    // the toast until the list is actually fresh.
+    ref.invalidate(driverUpcomingTripsProvider);
+    await ref.read(driverUpcomingTripsProvider.future);
+    if (!context.mounted) return;
     if (result.success) {
-      ref.invalidate(driverUpcomingTripsProvider);
       WgToast.success(context, 'Đã nhận chuyến ${trip.tripCode}');
     } else {
       WgToast.error(context, result.reason ?? 'Không thể nhận chuyến này');
-      ref.invalidate(driverUpcomingTripsProvider);
     }
   }
 
