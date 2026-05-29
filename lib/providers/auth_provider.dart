@@ -8,9 +8,14 @@ import '../models/user.dart';
 import '../services/auth_service.dart';
 import 'current_trip_provider.dart';
 import 'driver_provider.dart';
+import 'driver_vehicles_provider.dart';
 import 'incoming_trip_provider.dart';
 import 'mongo_provider.dart';
 import 'notifications_provider.dart';
+import 'scheduled_trips_provider.dart';
+import 'trip_offer_provider.dart';
+import 'trip_pools_provider.dart';
+import 'wallet_provider.dart';
 
 part 'auth_provider.g.dart';
 
@@ -273,14 +278,24 @@ class AuthState extends _$AuthState {
     await prefs.remove(_kPrefUserRole);
     state = const AsyncData(null);
 
-    // Hotfix: belt-and-braces invalidate. Most user-scoped providers
-    // already react to authStateProvider's null state because they
-    // ref.watch(authStateProvider.future), but a few keepAlive caches
-    // (notifications mock, current driver doc, in-progress trip, last
-    // dispatched offer) can hold a previous user's data across a
-    // logout → login switch. Clear them all on the way out so the
-    // next user's first read is guaranteed clean.
+    // Hotfix v3: aggressive nuke of every user-scoped cache. Even
+    // though most async providers watch authStateProvider.future and
+    // should rebuild on user change, riverpod's keepAlive caches +
+    // the brief AsyncData(null) bridge between A and B can leave
+    // stale data visible if any consumer reads .valueOrNull during
+    // the transition. Invalidate every user-scoped provider explicitly
+    // so the next sign-in starts from a guaranteed-clean slate.
     ref.invalidate(currentDriverProvider);
+    ref.invalidate(upcomingScheduledTripsProvider);
+    ref.invalidate(pastScheduledTripsProvider);
+    ref.invalidate(driverUpcomingTripsProvider);
+    ref.invalidate(currentUserWalletProvider);
+    ref.invalidate(walletHistoryProvider);
+    ref.invalidate(driverVehiclesListProvider);
+    ref.invalidate(driverPrimaryVehicleProvider);
+    ref.invalidate(driverAvailablePoolsProvider);
+    ref.invalidate(driverCollectingPoolsProvider);
+    ref.invalidate(driverCurrentOfferProvider);
     ref.read(notificationsProvider.notifier).reset();
     ref.read(currentTripProvider.notifier).clear();
     ref.read(activeOfferProvider.notifier).clear();

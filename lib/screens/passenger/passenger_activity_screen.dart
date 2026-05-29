@@ -188,11 +188,14 @@ class _ScheduledTripCard extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Hotfix: top row used to overflow ~30px when statusLabel
-                // was long ("Tài xế đã nhận") + tripCode was visible.
-                // Wrap intrinsic-width children in Flexible so the
-                // status badge + tripCode shrink/ellipsis instead of
-                // running off the card edge.
+                // Hotfix v3: previous Flexible wraps weren't enough —
+                // WgStatusBadge's inner Text has no maxLines/ellipsis,
+                // so it kept blowing past Flexible's loose-fit cap. Move
+                // tripCode out of the top row entirely (lives next to
+                // the fare now) and let the status badge consume all
+                // remaining width via FittedBox(scaleDown) so long
+                // labels like "Không tìm được tài xế" shrink to fit
+                // instead of overflowing 40+ px off-card.
                 Row(
                   children: [
                     WgBadge(
@@ -204,20 +207,14 @@ class _ScheduledTripCard extends StatelessWidget {
                           : WgBadgeVariant.info,
                     ),
                     const SizedBox(width: 8),
-                    Flexible(
-                      child: WgStatusBadge(label: trip.statusLabel, tone: _tone),
-                    ),
-                    const SizedBox(width: 8),
-                    Flexible(
-                      child: Text(
-                        trip.tripCode,
-                        textAlign: TextAlign.right,
-                        style: AppTypography.micro.copyWith(
-                          color: AppColors.ink500,
-                          fontFamily: 'monospace',
+                    Expanded(
+                      child: FittedBox(
+                        fit: BoxFit.scaleDown,
+                        alignment: Alignment.centerLeft,
+                        child: WgStatusBadge(
+                          label: trip.statusLabel,
+                          tone: _tone,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                   ],
@@ -332,6 +329,21 @@ class _ScheduledTripCard extends StatelessWidget {
                       '${trip.passengerCount}',
                       style: AppTypography.caption.copyWith(
                         color: AppColors.ink500,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    // Hotfix v3: tripCode relocated from top row down
+                    // here, ellipsis-aware so even WG-2026... can't
+                    // overflow.
+                    Flexible(
+                      child: Text(
+                        trip.tripCode,
+                        style: AppTypography.micro.copyWith(
+                          color: AppColors.ink500,
+                          fontFamily: 'monospace',
+                        ),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     const Spacer(),
