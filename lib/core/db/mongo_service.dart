@@ -23,6 +23,26 @@ class MongoService {
   Completer<Db>? _connecting;
   bool _indexesEnsured = false;
 
+  /// Phase 5Q hotfix: append Atlas-friendly pool + timeout params to
+  /// the URI loaded from .env so the driver keeps a small pool, drops
+  /// idle sockets before Atlas Free-tier evicts them, and falls back
+  /// fast instead of hanging on a TCP RST. `safeAtlas=true` is the
+  /// mongo_dart-specific flag for tolerating the SNI/TLS hiccups
+  /// Atlas Free intermittently inflicts on long-lived connections.
+  String _buildUri() {
+    final base = (dotenv.maybeGet('MONGODB_URI') ?? '').trim();
+    if (base.isEmpty) return '';
+    final extras = <String>[
+      'safeAtlas=true',
+      'maxIdleTimeMS=30000',
+      'maxPoolSize=10',
+      'connectTimeoutMS=10000',
+      'socketTimeoutMS=30000',
+    ];
+    final connector = base.contains('?') ? '&' : '?';
+    return '$base$connector${extras.join('&')}';
+  }
+
   /// Returns an open Db. Reconnects if dropped. Throws on persistent failure.
   Future<Db> getDb() async {
     final existing = _db;
@@ -33,7 +53,7 @@ class MongoService {
     final completer = Completer<Db>();
     _connecting = completer;
     try {
-      final uri = dotenv.maybeGet('MONGODB_URI') ?? '';
+      final uri = _buildUri();
       if (uri.isEmpty) {
         throw MongoServiceException('Thiếu MONGODB_URI trong .env');
       }
@@ -58,13 +78,13 @@ class MongoService {
         name: 'mongo',
       );
 
+      // Hotfix: hand the open Db back to callers immediately and run
+      // index creation in the background. The 13 createIndex round-
+      // trips used to run serially before we returned, and on Atlas
+      // Free that holds the socket long enough for Atlas to reset it
+      // mid-stream — the very symptom we're fixing.
       if (!_indexesEnsured) {
-        try {
-          await _ensureIndexes(db);
-          _indexesEnsured = true;
-        } catch (e) {
-          developer.log('[mongo] ensureIndexes warning: $e', name: 'mongo');
-        }
+        unawaited(_ensureIndexesInBackground(db));
       }
 
       completer.complete(db);
@@ -84,6 +104,18 @@ class MongoService {
       rethrow;
     } finally {
       _connecting = null;
+    }
+  }
+
+  Future<void> _ensureIndexesInBackground(Db db) async {
+    try {
+      await _ensureIndexes(db);
+      _indexesEnsured = true;
+      developer.log('[mongo] indexes ensured', name: 'mongo');
+    } catch (e) {
+      // Re-arm so the next reconnect retries — but never crash the
+      // app: the indexes are perf, not correctness.
+      developer.log('[mongo] ensureIndexes warning: $e', name: 'mongo');
     }
   }
 
