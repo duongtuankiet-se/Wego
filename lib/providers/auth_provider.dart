@@ -135,7 +135,6 @@ class AuthState extends _$AuthState {
       // synchronously walked back through the import graph to this
       // notifier while it was still mid-mutation.
       state = AsyncData(user);
-      _invalidateUserScopedCaches();
       developer.log('[auth] LOGIN OTP user=${user.id} role=${user.role.name}',
           name: 'auth');
       return null;
@@ -219,11 +218,13 @@ class AuthState extends _$AuthState {
       await prefs.setString(_kPrefUserId, user.id);
       await prefs.setString(_kPrefUserRole, user.role.name);
 
-      // Hotfix v5: same order as OTP — set state first, then bust the
-      // caches. Invalidating before the state update was triggering
-      // a Riverpod CircularDependencyError on Google sign-in.
+      // signIn does not need _invalidateUserScopedCaches() — there is
+      // no previous user's stale data in the cache when a new user
+      // logs in (providers re-build from the new user.id automatically
+      // because they watch authStateProvider.future). Calling invalidate
+      // here triggered a Riverpod CircularDependencyError because the
+      // invalidated providers synchronously re-entered this notifier.
       state = AsyncData(user);
-      _invalidateUserScopedCaches();
       developer.log(
         '[auth] LOGIN Google user=${user.id} role=${user.role.name}',
         name: 'auth',
