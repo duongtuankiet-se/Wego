@@ -37,8 +37,15 @@ class PassengerProfileScreen extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
-    await ref.read(authStateProvider.notifier).logout();
-    if (context.mounted) context.go('/role-select');
+    // Hotfix: even if logout() throws (e.g. Firebase signOut hiccup),
+    // the user has decided to leave — redirect them anyway. The
+    // notifier itself sets state = null unconditionally so the new
+    // route's auth-aware UI will see them as logged out.
+    try {
+      await ref.read(authStateProvider.notifier).logout();
+    } finally {
+      if (context.mounted) context.go('/role-select');
+    }
   }
 
   @override

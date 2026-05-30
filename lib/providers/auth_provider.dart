@@ -297,13 +297,35 @@ class AuthState extends _$AuthState {
   }
 
   Future<void> logout() async {
-    await AuthService.signOut();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.remove(_kPrefUserId);
-    await prefs.remove(_kPrefUserRole);
+    developer.log('[auth] LOGOUT starting…', name: 'auth');
+    // Hotfix: each step is independent and we want logout to "succeed"
+    // even if one of them throws — otherwise the caller's redirect
+    // never fires and the user is stranded on the profile screen. The
+    // critical bit (`state = AsyncData(null)`) is unconditional, so
+    // every consumer that watches authStateProvider will see the user
+    // gone regardless of what failed below.
+    try {
+      await AuthService.signOut();
+    } catch (e, st) {
+      developer.log('[auth] signOut failed: $e',
+          name: 'auth', error: e, stackTrace: st);
+    }
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_kPrefUserId);
+      await prefs.remove(_kPrefUserRole);
+    } catch (e, st) {
+      developer.log('[auth] prefs clear failed: $e',
+          name: 'auth', error: e, stackTrace: st);
+    }
     state = const AsyncData(null);
-    _invalidateUserScopedCaches();
-    developer.log('[auth] LOGOUT', name: 'auth');
+    try {
+      _invalidateUserScopedCaches();
+    } catch (e, st) {
+      developer.log('[auth] invalidate failed: $e',
+          name: 'auth', error: e, stackTrace: st);
+    }
+    developer.log('[auth] LOGOUT complete', name: 'auth');
   }
 
   /// Hotfix v4: invalidate every user-scoped cache + clear every

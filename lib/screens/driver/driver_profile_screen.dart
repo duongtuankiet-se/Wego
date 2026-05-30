@@ -41,8 +41,13 @@ class DriverProfileScreen extends ConsumerWidget {
       ),
     );
     if (ok != true) return;
-    await ref.read(authStateProvider.notifier).logout();
-    if (context.mounted) context.go('/role-select');
+    // Hotfix: same as passenger — redirect in finally so a logout()
+    // exception can't strand the user on the profile screen.
+    try {
+      await ref.read(authStateProvider.notifier).logout();
+    } finally {
+      if (context.mounted) context.go('/role-select');
+    }
   }
 
   @override
